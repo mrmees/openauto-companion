@@ -33,8 +33,10 @@ class CompanionService : Service() {
     private var connection: PiConnection? = null
     private val executor = Executors.newSingleThreadScheduledExecutor()
     private var pushTask: ScheduledFuture<*>? = null
+    private var retryTask: ScheduledFuture<*>? = null
     private val seq = AtomicInteger(0)
     private var socks5Server: Socks5Server? = null
+    private var connecting = false
 
     private var lastLocation: Location? = null
     private var locationManager: LocationManager? = null
@@ -59,27 +61,40 @@ class CompanionService : Service() {
 
         startLocationUpdates()
 
+        // Already connected or mid-connection — don't start another attempt
+        if (_connected.value || connecting) {
+            Log.i(TAG, "onStartCommand: already connected or connecting, ignoring")
+            if (_connected.value) updateNotification("Connected to $vehicleName")
+            return START_STICKY
+        }
+
+        connecting = true
+        attemptConnection(secret, vehicleName, socks5EnabledOverride)
+
+        return START_STICKY
+    }
+
+    private fun attemptConnection(secret: String, vehicleName: String, socks5Enabled: Boolean) {
+        retryTask?.cancel(false)
         executor.execute {
             val wifiNetwork = (application as org.openauto.companion.CompanionApp).wifiMonitor?.getWifiNetwork()
             Log.i(TAG, "WiFi network for binding: $wifiNetwork")
             val conn = PiConnection(sharedSecret = secret, wifiNetwork = wifiNetwork)
             if (conn.connect()) {
                 connection = conn
+                connecting = false
                 _connected.value = true
                 Log.i(TAG, "Connection established, _connected = true")
-                startSocks5(secret, socks5EnabledOverride)
+                startSocks5(secret, socks5Enabled)
                 updateNotification("Connected to $vehicleName")
                 startPushLoop()
             } else {
                 updateNotification("Connection failed — retrying...")
-                // Retry after 10s
-                executor.schedule({
-                    onStartCommand(intent, flags, startId)
+                retryTask = executor.schedule({
+                    attemptConnection(secret, vehicleName, socks5Enabled)
                 }, 10, TimeUnit.SECONDS)
             }
         }
-
-        return START_STICKY
     }
 
     private fun startPushLoop() {
@@ -199,8 +214,10 @@ class CompanionService : Service() {
 
     override fun onDestroy() {
         _connected.value = false
+        connecting = false
         _socks5Active.value = false
         _vehicleName.value = ""
+        retryTask?.cancel(false)
         pushTask?.cancel(false)
         socks5Server?.stop()
         socks5Server = null
