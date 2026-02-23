@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity() {
 
                 val isConnected by CompanionService.connected.collectAsStateWithLifecycle()
                 val isSocks5Active by CompanionService.socks5Active.collectAsStateWithLifecycle()
+                val isAudioKeepAliveActive by CompanionService.audioKeepAliveActive.collectAsStateWithLifecycle()
                 val connectedVehicleName by CompanionService.vehicleName.collectAsStateWithLifecycle()
 
                 // Determine which SSID is currently connected (by matching vehicle name back)
@@ -93,10 +94,14 @@ class MainActivity : ComponentActivity() {
                             sharingGps = true,
                             sharingBattery = true,
                             socks5Active = isThisConnected && isSocks5Active,
+                            audioKeepAliveActive = isThisConnected && isAudioKeepAliveActive,
                             ssid = vehicle.ssid
                         )
                         var socks5Enabled by remember(vehicle.id) {
                             mutableStateOf(vehicle.socks5Enabled)
+                        }
+                        var audioKeepAlive by remember(vehicle.id) {
+                            mutableStateOf(vehicle.audioKeepAlive)
                         }
 
                         StatusScreen(
@@ -106,6 +111,11 @@ class MainActivity : ComponentActivity() {
                             onSocks5Toggle = {
                                 socks5Enabled = it
                                 prefs.updateVehicle(vehicle.id) { v -> v.copy(socks5Enabled = it) }
+                            },
+                            audioKeepAlive = audioKeepAlive,
+                            onAudioKeepAliveToggle = {
+                                audioKeepAlive = it
+                                prefs.updateVehicle(vehicle.id) { v -> v.copy(audioKeepAlive = it) }
                             },
                             onUnpair = {
                                 prefs.removeVehicle(vehicle.id)

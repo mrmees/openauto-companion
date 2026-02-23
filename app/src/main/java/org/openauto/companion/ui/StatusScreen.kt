@@ -16,6 +16,7 @@ data class CompanionStatus(
     val sharingGps: Boolean = false,
     val sharingBattery: Boolean = false,
     val socks5Active: Boolean = false,
+    val audioKeepAliveActive: Boolean = false,
     val ssid: String = ""
 )
 
@@ -25,6 +26,8 @@ fun StatusScreen(
     status: CompanionStatus,
     socks5Enabled: Boolean,
     onSocks5Toggle: (Boolean) -> Unit,
+    audioKeepAlive: Boolean,
+    onAudioKeepAliveToggle: (Boolean) -> Unit,
     onUnpair: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -69,6 +72,7 @@ fun StatusScreen(
         StatusRow("GPS Location", status.sharingGps && status.connected)
         StatusRow("Battery Level", status.sharingBattery && status.connected)
         StatusRow("Internet (SOCKS5)", status.socks5Active && status.connected)
+        StatusRow("Audio Keep Alive", status.audioKeepAliveActive && status.connected)
 
         Spacer(modifier = Modifier.height(24.dp))
 
@@ -83,6 +87,22 @@ fun StatusScreen(
         ) {
             Text("Internet Sharing")
             Switch(checked = socks5Enabled, onCheckedChange = onSocks5Toggle)
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text("Audio Keep Alive")
+                Text(
+                    "Plays silence to keep AA audio open",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(checked = audioKeepAlive, onCheckedChange = onAudioKeepAliveToggle)
         }
 
         Spacer(modifier = Modifier.height(48.dp))

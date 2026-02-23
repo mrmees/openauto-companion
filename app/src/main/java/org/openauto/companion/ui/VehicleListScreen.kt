@@ -49,7 +49,7 @@ fun VehicleListScreen(
                     if (tapTimes.size >= 5) {
                         tapTimes = emptyList()
                         context.startActivity(Intent(Intent.ACTION_VIEW,
-                            Uri.parse("https://www.youtube.com/watch?v=gbyvvc6n2Oo")))
+                            Uri.parse("https://youtu.be/gbyvvc6n2Oo?si=eWWmscODmVbl-fhH&t=8")))
                     }
                 }
         )

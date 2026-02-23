@@ -9,7 +9,8 @@ data class Vehicle(
     val ssid: String,
     val name: String = ssid,
     val sharedSecret: String,
-    val socks5Enabled: Boolean = true
+    val socks5Enabled: Boolean = true,
+    val audioKeepAlive: Boolean = false
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -17,6 +18,7 @@ data class Vehicle(
         put("name", name)
         put("shared_secret", sharedSecret)
         put("socks5_enabled", socks5Enabled)
+        put("audio_keep_alive", audioKeepAlive)
     }
 
     companion object {
@@ -25,7 +27,8 @@ data class Vehicle(
             ssid = json.getString("ssid"),
             name = json.optString("name", json.getString("ssid")),
             sharedSecret = json.getString("shared_secret"),
-            socks5Enabled = json.optBoolean("socks5_enabled", true)
+            socks5Enabled = json.optBoolean("socks5_enabled", true),
+            audioKeepAlive = json.optBoolean("audio_keep_alive", false)
         )
 
         fun listToJson(vehicles: List<Vehicle>): String =

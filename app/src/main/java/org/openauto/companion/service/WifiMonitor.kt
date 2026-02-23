@@ -118,6 +118,7 @@ class WifiMonitor(
             putExtra("vehicle_name", vehicle.name)
             putExtra("vehicle_id", vehicle.id)
             putExtra("socks5_enabled", vehicle.socks5Enabled)
+            putExtra("audio_keep_alive", vehicle.audioKeepAlive)
         }
         ContextCompat.startForegroundService(context, intent)
     }

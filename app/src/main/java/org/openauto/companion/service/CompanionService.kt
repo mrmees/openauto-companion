@@ -36,7 +36,9 @@ class CompanionService : Service() {
     private var retryTask: ScheduledFuture<*>? = null
     private val seq = AtomicInteger(0)
     private var socks5Server: Socks5Server? = null
+    private var silentPlayer: SilentAudioPlayer? = null
     private var connecting = false
+    private var _currentVehicleName = "OpenAuto Prodigy"
 
     private var lastLocation: Location? = null
     private var locationManager: LocationManager? = null
@@ -53,9 +55,16 @@ class CompanionService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Handle notification action toggle
+        if (intent?.action == ACTION_TOGGLE_AUDIO) {
+            toggleSilentAudio()
+            return START_STICKY
+        }
+
         val secret = intent?.getStringExtra("shared_secret") ?: ""
         val vehicleName = intent?.getStringExtra("vehicle_name") ?: "OpenAuto Prodigy"
         val socks5EnabledOverride = intent?.getBooleanExtra("socks5_enabled", true) ?: true
+        val audioKeepAlive = intent?.getBooleanExtra("audio_keep_alive", false) ?: false
         _vehicleName.value = vehicleName
         startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
 
@@ -64,17 +73,18 @@ class CompanionService : Service() {
         // Already connected or mid-connection — don't start another attempt
         if (_connected.value || connecting) {
             Log.i(TAG, "onStartCommand: already connected or connecting, ignoring")
-            if (_connected.value) updateNotification("Connected to $vehicleName")
+            if (_connected.value) updateNotification("Connected to $_currentVehicleName")
             return START_STICKY
         }
 
+        _currentVehicleName = vehicleName
         connecting = true
-        attemptConnection(secret, vehicleName, socks5EnabledOverride)
+        attemptConnection(secret, vehicleName, socks5EnabledOverride, audioKeepAlive)
 
         return START_STICKY
     }
 
-    private fun attemptConnection(secret: String, vehicleName: String, socks5Enabled: Boolean) {
+    private fun attemptConnection(secret: String, vehicleName: String, socks5Enabled: Boolean, audioKeepAlive: Boolean = false) {
         retryTask?.cancel(false)
         executor.execute {
             val wifiNetwork = (application as org.openauto.companion.CompanionApp).wifiMonitor?.getWifiNetwork()
@@ -85,13 +95,15 @@ class CompanionService : Service() {
                 connecting = false
                 _connected.value = true
                 Log.i(TAG, "Connection established, _connected = true")
+                _currentVehicleName = vehicleName
                 startSocks5(secret, socks5Enabled)
+                startSilentAudio(audioKeepAlive)
                 updateNotification("Connected to $vehicleName")
                 startPushLoop()
             } else {
                 updateNotification("Connection failed — retrying...")
                 retryTask = executor.schedule({
-                    attemptConnection(secret, vehicleName, socks5Enabled)
+                    attemptConnection(secret, vehicleName, socks5Enabled, audioKeepAlive)
                 }, 10, TimeUnit.SECONDS)
             }
         }
@@ -174,6 +186,34 @@ class CompanionService : Service() {
         }
     }
 
+    private fun startSilentAudio(enabled: Boolean) {
+        if (!enabled) {
+            Log.i(TAG, "Audio keep alive disabled for this vehicle")
+            return
+        }
+        silentPlayer = SilentAudioPlayer()
+        silentPlayer!!.start()
+        _audioKeepAliveActive.value = true
+        Log.i(TAG, "Audio keep alive started")
+    }
+
+    private fun toggleSilentAudio() {
+        if (silentPlayer?.isActive == true) {
+            silentPlayer?.stop()
+            silentPlayer = null
+            _audioKeepAliveActive.value = false
+            Log.i(TAG, "Audio keep alive toggled OFF")
+        } else {
+            silentPlayer = SilentAudioPlayer()
+            silentPlayer!!.start()
+            _audioKeepAliveActive.value = true
+            Log.i(TAG, "Audio keep alive toggled ON")
+        }
+        if (_connected.value) {
+            updateNotification("Connected to $_currentVehicleName")
+        }
+    }
+
     private fun startLocationUpdates() {
         try {
             locationManager?.requestLocationUpdates(
@@ -198,13 +238,27 @@ class CompanionService : Service() {
             this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE
         )
-        return NotificationCompat.Builder(this, CompanionApp.CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CompanionApp.CHANNEL_ID)
             .setContentTitle("OpenAuto Companion")
             .setContentText(text)
             .setSmallIcon(android.R.drawable.ic_menu_share)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
-            .build()
+
+        // Add audio keep alive toggle action when connected
+        if (_connected.value) {
+            val toggleIntent = Intent(this, CompanionService::class.java).apply {
+                action = ACTION_TOGGLE_AUDIO
+            }
+            val togglePending = PendingIntent.getService(
+                this, 1, toggleIntent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val label = if (_audioKeepAliveActive.value) "\uD83D\uDD0A Audio Alive: ON" else "\uD83D\uDD07 Audio Alive: OFF"
+            builder.addAction(0, label, togglePending)
+        }
+
+        return builder.build()
     }
 
     private fun updateNotification(text: String) {
@@ -216,11 +270,14 @@ class CompanionService : Service() {
         _connected.value = false
         connecting = false
         _socks5Active.value = false
+        _audioKeepAliveActive.value = false
         _vehicleName.value = ""
         retryTask?.cancel(false)
         pushTask?.cancel(false)
         socks5Server?.stop()
         socks5Server = null
+        silentPlayer?.stop()
+        silentPlayer = null
         executor.execute {
             connection?.disconnect()
         }
@@ -234,12 +291,16 @@ class CompanionService : Service() {
     companion object {
         private const val TAG = "CompanionService"
         private const val NOTIFICATION_ID = 1001
+        private const val ACTION_TOGGLE_AUDIO = "org.openauto.companion.TOGGLE_AUDIO"
 
         private val _connected = MutableStateFlow(false)
         val connected: StateFlow<Boolean> = _connected.asStateFlow()
 
         private val _socks5Active = MutableStateFlow(false)
         val socks5Active: StateFlow<Boolean> = _socks5Active.asStateFlow()
+
+        private val _audioKeepAliveActive = MutableStateFlow(false)
+        val audioKeepAliveActive: StateFlow<Boolean> = _audioKeepAliveActive.asStateFlow()
 
         private val _vehicleName = MutableStateFlow("")
         val vehicleName: StateFlow<String> = _vehicleName.asStateFlow()
