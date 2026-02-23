@@ -1,5 +1,6 @@
 package org.openauto.companion.net
 
+import android.net.Network
 import android.util.Log
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -11,7 +12,8 @@ import java.net.Socket
 class PiConnection(
     private val host: String = "10.0.0.1",
     private val port: Int = 9876,
-    private val sharedSecret: String
+    private val sharedSecret: String,
+    private val wifiNetwork: Network? = null
 ) {
     private var socket: Socket? = null
     private var writer: PrintWriter? = null
@@ -23,7 +25,14 @@ class PiConnection(
 
     fun connect(): Boolean {
         return try {
-            val s = Socket()
+            val s = if (wifiNetwork != null) {
+                // Bind socket to WiFi network so it doesn't route through cellular
+                val factory = wifiNetwork.socketFactory
+                Log.i(TAG, "Creating socket bound to WiFi network")
+                factory.createSocket() as Socket
+            } else {
+                Socket()
+            }
             s.connect(InetSocketAddress(host, port), 5000)
             s.soTimeout = 10000
             socket = s
@@ -51,6 +60,7 @@ class PiConnection(
             val keyHex = ack.getString("session_key")
             sessionKey = keyHex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
             isAuthenticated = true
+            Log.i(TAG, "Connected and authenticated successfully")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Connection failed", e)

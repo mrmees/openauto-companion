@@ -18,6 +18,9 @@ import org.openauto.companion.CompanionApp
 import org.openauto.companion.net.PiConnection
 import org.openauto.companion.net.Protocol
 import org.openauto.companion.ui.MainActivity
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.TimeZone
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -51,9 +54,13 @@ class CompanionService : Service() {
         startLocationUpdates()
 
         executor.execute {
-            val conn = PiConnection(sharedSecret = secret)
+            val wifiNetwork = (application as org.openauto.companion.CompanionApp).wifiMonitor?.getWifiNetwork()
+            Log.i(TAG, "WiFi network for binding: $wifiNetwork")
+            val conn = PiConnection(sharedSecret = secret, wifiNetwork = wifiNetwork)
             if (conn.connect()) {
                 connection = conn
+                _connected.value = true
+                Log.i(TAG, "Connection established, _connected = true")
                 updateNotification("Connected to OpenAuto Prodigy")
                 startPushLoop()
             } else {
@@ -74,6 +81,7 @@ class CompanionService : Service() {
                 val conn = connection ?: return@scheduleAtFixedRate
                 val key = conn.sessionKey ?: return@scheduleAtFixedRate
                 if (!conn.isConnected()) {
+                    _connected.value = false
                     stopSelf()
                     return@scheduleAtFixedRate
                 }
@@ -158,6 +166,7 @@ class CompanionService : Service() {
     }
 
     override fun onDestroy() {
+        _connected.value = false
         pushTask?.cancel(false)
         executor.execute {
             connection?.disconnect()
@@ -172,5 +181,8 @@ class CompanionService : Service() {
     companion object {
         private const val TAG = "CompanionService"
         private const val NOTIFICATION_ID = 1001
+
+        private val _connected = MutableStateFlow(false)
+        val connected: StateFlow<Boolean> = _connected.asStateFlow()
     }
 }

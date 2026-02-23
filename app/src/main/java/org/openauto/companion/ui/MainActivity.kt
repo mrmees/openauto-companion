@@ -10,8 +10,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.openauto.companion.CompanionApp
 import org.openauto.companion.data.CompanionPrefs
+import org.openauto.companion.service.CompanionService
 import java.security.MessageDigest
 
 class MainActivity : ComponentActivity() {
@@ -42,11 +44,19 @@ class MainActivity : ComponentActivity() {
                         startMonitoringIfPaired()
                     })
                 } else {
-                    val status = remember { mutableStateOf(CompanionStatus(ssid = prefs.targetSsid)) }
+                    val isConnected by CompanionService.connected.collectAsStateWithLifecycle()
+                    val status = CompanionStatus(
+                        connected = isConnected,
+                        sharingTime = true,
+                        sharingGps = true,
+                        sharingBattery = true,
+                        socks5Active = false,
+                        ssid = prefs.targetSsid
+                    )
                     var socks5Enabled by remember { mutableStateOf(prefs.socks5Enabled) }
 
                     StatusScreen(
-                        status = status.value,
+                        status = status,
                         socks5Enabled = socks5Enabled,
                         onSocks5Toggle = {
                             socks5Enabled = it
