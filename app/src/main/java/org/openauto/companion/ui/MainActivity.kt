@@ -45,12 +45,13 @@ class MainActivity : ComponentActivity() {
                     })
                 } else {
                     val isConnected by CompanionService.connected.collectAsStateWithLifecycle()
+                    val isSocks5Active by CompanionService.socks5Active.collectAsStateWithLifecycle()
                     val status = CompanionStatus(
                         connected = isConnected,
                         sharingTime = true,
                         sharingGps = true,
                         sharingBattery = true,
-                        socks5Active = false,
+                        socks5Active = isSocks5Active,
                         ssid = prefs.targetSsid
                     )
                     var socks5Enabled by remember { mutableStateOf(prefs.socks5Enabled) }

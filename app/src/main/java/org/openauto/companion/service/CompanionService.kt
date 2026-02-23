@@ -150,6 +150,7 @@ class CompanionService : Service() {
                 connectivityManager = cm
             )
             socks5Server!!.start()
+            _socks5Active.value = true
             Log.i(TAG, "SOCKS5 proxy started on port 1080 (user=$user)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start SOCKS5 proxy", e)
@@ -197,6 +198,7 @@ class CompanionService : Service() {
 
     override fun onDestroy() {
         _connected.value = false
+        _socks5Active.value = false
         pushTask?.cancel(false)
         socks5Server?.stop()
         socks5Server = null
@@ -216,5 +218,8 @@ class CompanionService : Service() {
 
         private val _connected = MutableStateFlow(false)
         val connected: StateFlow<Boolean> = _connected.asStateFlow()
+
+        private val _socks5Active = MutableStateFlow(false)
+        val socks5Active: StateFlow<Boolean> = _socks5Active.asStateFlow()
     }
 }
