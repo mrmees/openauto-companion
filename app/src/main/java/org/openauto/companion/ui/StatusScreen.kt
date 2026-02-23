@@ -75,7 +75,10 @@ fun StatusScreen(
             Switch(checked = socks5Enabled, onCheckedChange = onSocks5Toggle)
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(48.dp))
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(modifier = Modifier.height(16.dp))
 
         TextButton(onClick = onUnpair, modifier = Modifier.align(Alignment.CenterHorizontally)) {
             Text("Unpair", color = MaterialTheme.colorScheme.error)
