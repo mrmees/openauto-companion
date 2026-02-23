@@ -1,9 +1,176 @@
 package org.openauto.companion.service
 
+import android.app.Notification
+import android.app.PendingIntent
 import android.app.Service
+import android.os.BatteryManager
 import android.content.Intent
+import android.content.IntentFilter
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
 import android.os.IBinder
+import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import org.openauto.companion.CompanionApp
+import org.openauto.companion.net.PiConnection
+import org.openauto.companion.net.Protocol
+import org.openauto.companion.ui.MainActivity
+import java.util.TimeZone
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class CompanionService : Service() {
+    private var connection: PiConnection? = null
+    private val executor = Executors.newSingleThreadScheduledExecutor()
+    private var pushTask: ScheduledFuture<*>? = null
+    private val seq = AtomicInteger(0)
+
+    private var lastLocation: Location? = null
+    private var locationManager: LocationManager? = null
+
+    private val locationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) {
+            lastLocation = location
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        locationManager = getSystemService(LocationManager::class.java)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val secret = intent?.getStringExtra("shared_secret") ?: ""
+        startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
+
+        startLocationUpdates()
+
+        executor.execute {
+            val conn = PiConnection(sharedSecret = secret)
+            if (conn.connect()) {
+                connection = conn
+                updateNotification("Connected to OpenAuto Prodigy")
+                startPushLoop()
+            } else {
+                updateNotification("Connection failed — retrying...")
+                // Retry after 10s
+                executor.schedule({
+                    onStartCommand(intent, flags, startId)
+                }, 10, TimeUnit.SECONDS)
+            }
+        }
+
+        return START_STICKY
+    }
+
+    private fun startPushLoop() {
+        pushTask = executor.scheduleAtFixedRate({
+            try {
+                val conn = connection ?: return@scheduleAtFixedRate
+                val key = conn.sessionKey ?: return@scheduleAtFixedRate
+                if (!conn.isConnected()) {
+                    stopSelf()
+                    return@scheduleAtFixedRate
+                }
+
+                val loc = lastLocation
+                val gpsAgeMs = if (loc != null) {
+                    ((SystemClock.elapsedRealtimeNanos() - loc.elapsedRealtimeNanos) / 1_000_000).toInt()
+                } else -1
+
+                val batteryIntent = registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+                val batteryLevel = batteryIntent?.let {
+                    val level = it.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = it.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+                    (level * 100) / scale
+                } ?: -1
+                val charging = batteryIntent?.let {
+                    val status = it.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                        status == BatteryManager.BATTERY_STATUS_FULL
+                } ?: false
+
+                val status = Protocol.buildStatus(
+                    seq = seq.incrementAndGet(),
+                    sessionKey = key,
+                    timeMs = System.currentTimeMillis(),
+                    timezone = TimeZone.getDefault().id,
+                    gpsLat = loc?.latitude ?: 0.0,
+                    gpsLon = loc?.longitude ?: 0.0,
+                    gpsAccuracy = loc?.accuracy?.toDouble() ?: 0.0,
+                    gpsSpeed = loc?.speed?.toDouble() ?: 0.0,
+                    gpsBearing = loc?.bearing?.toDouble() ?: 0.0,
+                    gpsAgeMs = gpsAgeMs,
+                    batteryLevel = batteryLevel,
+                    batteryCharging = charging,
+                    socks5Port = 1080,
+                    socks5Active = false  // TODO: wire to SOCKS5 service state
+                )
+
+                conn.sendStatus(status)
+            } catch (e: Exception) {
+                Log.e(TAG, "Push failed", e)
+            }
+        }, 0, 5, TimeUnit.SECONDS)
+    }
+
+    private fun startLocationUpdates() {
+        try {
+            locationManager?.requestLocationUpdates(
+                LocationManager.FUSED_PROVIDER,
+                5000L, 0f, locationListener, Looper.getMainLooper()
+            )
+        } catch (e: SecurityException) {
+            Log.w(TAG, "Location permission not granted", e)
+            try {
+                locationManager?.requestLocationUpdates(
+                    LocationManager.GPS_PROVIDER,
+                    5000L, 0f, locationListener, Looper.getMainLooper()
+                )
+            } catch (_: SecurityException) {
+                Log.e(TAG, "No location permission at all")
+            }
+        }
+    }
+
+    private fun buildNotification(text: String): Notification {
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(this, CompanionApp.CHANNEL_ID)
+            .setContentTitle("OpenAuto Companion")
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_menu_share)
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .build()
+    }
+
+    private fun updateNotification(text: String) {
+        val nm = getSystemService(android.app.NotificationManager::class.java)
+        nm.notify(NOTIFICATION_ID, buildNotification(text))
+    }
+
+    override fun onDestroy() {
+        pushTask?.cancel(false)
+        executor.execute {
+            connection?.disconnect()
+        }
+        locationManager?.removeUpdates(locationListener)
+        executor.shutdown()
+        super.onDestroy()
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        private const val TAG = "CompanionService"
+        private const val NOTIFICATION_ID = 1001
+    }
 }
