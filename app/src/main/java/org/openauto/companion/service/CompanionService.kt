@@ -16,7 +16,6 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import org.openauto.companion.CompanionApp
-import org.openauto.companion.data.CompanionPrefs
 import org.openauto.companion.net.PiConnection
 import org.openauto.companion.net.Protocol
 import org.openauto.companion.net.Socks5Server
@@ -53,6 +52,9 @@ class CompanionService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val secret = intent?.getStringExtra("shared_secret") ?: ""
+        val vehicleName = intent?.getStringExtra("vehicle_name") ?: "OpenAuto Prodigy"
+        val socks5EnabledOverride = intent?.getBooleanExtra("socks5_enabled", true) ?: true
+        _vehicleName.value = vehicleName
         startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
 
         startLocationUpdates()
@@ -65,8 +67,8 @@ class CompanionService : Service() {
                 connection = conn
                 _connected.value = true
                 Log.i(TAG, "Connection established, _connected = true")
-                startSocks5(secret)
-                updateNotification("Connected to OpenAuto Prodigy")
+                startSocks5(secret, socks5EnabledOverride)
+                updateNotification("Connected to $vehicleName")
                 startPushLoop()
             } else {
                 updateNotification("Connection failed — retrying...")
@@ -132,10 +134,9 @@ class CompanionService : Service() {
         }, 0, 5, TimeUnit.SECONDS)
     }
 
-    private fun startSocks5(secret: String) {
-        val prefs = CompanionPrefs(this)
-        if (!prefs.socks5Enabled) {
-            Log.i(TAG, "SOCKS5 proxy disabled in preferences")
+    private fun startSocks5(secret: String, enabled: Boolean = true) {
+        if (!enabled) {
+            Log.i(TAG, "SOCKS5 proxy disabled for this vehicle")
             return
         }
         try {
@@ -199,6 +200,7 @@ class CompanionService : Service() {
     override fun onDestroy() {
         _connected.value = false
         _socks5Active.value = false
+        _vehicleName.value = ""
         pushTask?.cancel(false)
         socks5Server?.stop()
         socks5Server = null
@@ -221,5 +223,8 @@ class CompanionService : Service() {
 
         private val _socks5Active = MutableStateFlow(false)
         val socks5Active: StateFlow<Boolean> = _socks5Active.asStateFlow()
+
+        private val _vehicleName = MutableStateFlow("")
+        val vehicleName: StateFlow<String> = _vehicleName.asStateFlow()
     }
 }

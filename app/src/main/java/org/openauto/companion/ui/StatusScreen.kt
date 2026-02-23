@@ -19,17 +19,23 @@ data class CompanionStatus(
 
 @Composable
 fun StatusScreen(
+    vehicleName: String,
     status: CompanionStatus,
     socks5Enabled: Boolean,
     onSocks5Toggle: (Boolean) -> Unit,
-    onUnpair: () -> Unit
+    onUnpair: () -> Unit,
+    onBack: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp)
     ) {
-        Text("OpenAuto Companion", style = MaterialTheme.typography.headlineMedium)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = onBack) { Text("\u2190") }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(vehicleName, style = MaterialTheme.typography.headlineMedium)
+        }
         Spacer(modifier = Modifier.height(24.dp))
 
         // Connection status

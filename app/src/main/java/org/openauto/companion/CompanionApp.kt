@@ -3,6 +3,7 @@ package org.openauto.companion
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import org.openauto.companion.data.Vehicle
 import org.openauto.companion.service.WifiMonitor
 
 class CompanionApp : Application() {
@@ -14,9 +15,9 @@ class CompanionApp : Application() {
         createNotificationChannel()
     }
 
-    fun startWifiMonitor(sharedSecret: String, targetSsid: String = "OpenAutoProdigy") {
+    fun startWifiMonitor(vehicles: List<Vehicle>) {
         wifiMonitor?.stop()
-        wifiMonitor = WifiMonitor(this, targetSsid, sharedSecret).also { it.start() }
+        wifiMonitor = WifiMonitor(this, vehicles).also { it.start() }
     }
 
     private fun createNotificationChannel() {

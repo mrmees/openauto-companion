@@ -10,17 +10,18 @@ import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.util.Log
 import androidx.core.content.ContextCompat
+import org.openauto.companion.data.Vehicle
 
 class WifiMonitor(
     private val context: Context,
-    private val targetSsid: String = "OpenAutoProdigy",
-    private val sharedSecret: String
+    private val vehicles: List<Vehicle>
 ) {
     private val connectivityManager =
         context.getSystemService(ConnectivityManager::class.java)
     private var registered = false
-
     private var wifiNetwork: Network? = null
+    private var activeVehicle: Vehicle? = null
+    private val ssidMap: Map<String, Vehicle> = vehicles.associateBy { it.ssid }
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback(
         FLAG_INCLUDE_LOCATION_INFO
@@ -28,36 +29,38 @@ class WifiMonitor(
         override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
             val wifiInfo = caps.transportInfo as? WifiInfo ?: return
             val ssid = wifiInfo.ssid?.removeSurrounding("\"") ?: return
+            if (ssid == "<unknown ssid>") return
 
-            if (ssid == targetSsid) {
-                Log.i(TAG, "Connected to target SSID: $ssid")
-                wifiNetwork = network
-                startCompanionService()
-            }
+            val vehicle = ssidMap[ssid] ?: return
+            if (activeVehicle?.ssid == ssid) return // already connected to this one
+
+            Log.i(TAG, "Matched vehicle '${vehicle.name}' on SSID: $ssid")
+            wifiNetwork = network
+            activeVehicle = vehicle
+            startCompanionService(vehicle)
         }
 
         override fun onLost(network: Network) {
             Log.i(TAG, "WiFi network lost")
             wifiNetwork = null
+            activeVehicle = null
             stopCompanionService()
         }
     }
 
     fun start() {
         if (registered) return
+        if (vehicles.isEmpty()) return
         val request = NetworkRequest.Builder()
             .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
             .build()
         connectivityManager.registerNetworkCallback(request, networkCallback)
         registered = true
-        Log.i(TAG, "WiFi monitor started, watching for SSID: $targetSsid")
-
-        // Check if already connected to target SSID (callback won't fire for existing networks)
+        Log.i(TAG, "WiFi monitor started, watching for ${vehicles.size} vehicle(s): ${vehicles.map { it.ssid }}")
         checkCurrentNetwork()
     }
 
     private fun checkCurrentNetwork() {
-        // Try ConnectivityManager first (allNetworks + transportInfo)
         try {
             @Suppress("DEPRECATION")
             for (network in connectivityManager.allNetworks) {
@@ -65,37 +68,40 @@ class WifiMonitor(
                 if (!caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)) continue
                 val wifiInfo = caps.transportInfo as? WifiInfo
                 val ssid = wifiInfo?.ssid?.removeSurrounding("\"")
-                Log.i(TAG, "Network check: transport=WiFi, ssid=$ssid, transportInfo=${caps.transportInfo?.javaClass?.simpleName}")
-                if (ssid == targetSsid) {
-                    Log.i(TAG, "Already connected to target SSID via ConnectivityManager")
+                Log.i(TAG, "Network check: transport=WiFi, ssid=$ssid")
+                val vehicle = ssid?.let { ssidMap[it] }
+                if (vehicle != null) {
+                    Log.i(TAG, "Already connected to vehicle '${vehicle.name}' via ConnectivityManager")
                     wifiNetwork = network
-                    startCompanionService()
+                    activeVehicle = vehicle
+                    startCompanionService(vehicle)
                     return
                 }
-                // Even if SSID unknown, save the WiFi network for binding
                 if (wifiNetwork == null) wifiNetwork = network
             }
         } catch (e: Exception) {
             Log.w(TAG, "ConnectivityManager network scan failed", e)
         }
 
-        // Fallback: WifiManager.connectionInfo (deprecated but reliable for SSID)
+        // Fallback: WifiManager.connectionInfo
         try {
             val wifiManager = context.getSystemService(WifiManager::class.java)
             @Suppress("DEPRECATION")
             val info = wifiManager.connectionInfo
             val ssid = info?.ssid?.removeSurrounding("\"")
             Log.i(TAG, "WifiManager fallback: ssid=$ssid")
-            if (ssid == targetSsid) {
-                Log.i(TAG, "Already connected to target SSID via WifiManager")
-                startCompanionService()
+            val vehicle = ssid?.let { ssidMap[it] }
+            if (vehicle != null) {
+                Log.i(TAG, "Already connected to vehicle '${vehicle.name}' via WifiManager")
+                activeVehicle = vehicle
+                startCompanionService(vehicle)
                 return
             }
         } catch (e: Exception) {
             Log.w(TAG, "WifiManager fallback failed", e)
         }
 
-        Log.i(TAG, "Target SSID not found in current networks")
+        Log.i(TAG, "No paired vehicle SSID found in current networks")
     }
 
     fun stop() {
@@ -106,9 +112,12 @@ class WifiMonitor(
 
     fun getWifiNetwork(): Network? = wifiNetwork
 
-    private fun startCompanionService() {
+    private fun startCompanionService(vehicle: Vehicle) {
         val intent = Intent(context, CompanionService::class.java).apply {
-            putExtra("shared_secret", sharedSecret)
+            putExtra("shared_secret", vehicle.sharedSecret)
+            putExtra("vehicle_name", vehicle.name)
+            putExtra("vehicle_id", vehicle.id)
+            putExtra("socks5_enabled", vehicle.socks5Enabled)
         }
         ContextCompat.startForegroundService(context, intent)
     }

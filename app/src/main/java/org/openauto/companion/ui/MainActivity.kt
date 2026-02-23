@@ -13,6 +13,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.openauto.companion.CompanionApp
 import org.openauto.companion.data.CompanionPrefs
+import org.openauto.companion.data.Vehicle
 import org.openauto.companion.service.CompanionService
 import java.security.MessageDigest
 
@@ -35,39 +36,81 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme {
-                var isPaired by remember { mutableStateOf(prefs.isPaired) }
+                var vehicles by remember { mutableStateOf(prefs.vehicles) }
+                var screen by remember { mutableStateOf<Screen>(
+                    if (vehicles.isEmpty()) Screen.Pairing else Screen.VehicleList
+                ) }
 
-                if (!isPaired) {
-                    PairingScreen(onPaired = { pin ->
-                        deriveAndStoreSecret(pin)
-                        isPaired = true
-                        startMonitoringIfPaired()
-                    })
-                } else {
-                    val isConnected by CompanionService.connected.collectAsStateWithLifecycle()
-                    val isSocks5Active by CompanionService.socks5Active.collectAsStateWithLifecycle()
-                    val status = CompanionStatus(
-                        connected = isConnected,
-                        sharingTime = true,
-                        sharingGps = true,
-                        sharingBattery = true,
-                        socks5Active = isSocks5Active,
-                        ssid = prefs.targetSsid
-                    )
-                    var socks5Enabled by remember { mutableStateOf(prefs.socks5Enabled) }
+                val isConnected by CompanionService.connected.collectAsStateWithLifecycle()
+                val isSocks5Active by CompanionService.socks5Active.collectAsStateWithLifecycle()
+                val connectedVehicleName by CompanionService.vehicleName.collectAsStateWithLifecycle()
 
-                    StatusScreen(
-                        status = status,
-                        socks5Enabled = socks5Enabled,
-                        onSocks5Toggle = {
-                            socks5Enabled = it
-                            prefs.socks5Enabled = it
-                        },
-                        onUnpair = {
-                            prefs.sharedSecret = ""
-                            isPaired = false
+                // Determine which SSID is currently connected (by matching vehicle name back)
+                val connectedSsid = if (isConnected) {
+                    vehicles.find { it.name == connectedVehicleName }?.ssid
+                } else null
+
+                when (val s = screen) {
+                    is Screen.VehicleList -> {
+                        VehicleListScreen(
+                            vehicles = vehicles,
+                            connectedSsid = connectedSsid,
+                            onVehicleTap = { screen = Screen.Status(it) },
+                            onAddVehicle = { screen = Screen.Pairing },
+                            onRemoveVehicle = { vehicle ->
+                                prefs.removeVehicle(vehicle.id)
+                                vehicles = prefs.vehicles
+                                restartMonitoring()
+                            }
+                        )
+                    }
+                    is Screen.Pairing -> {
+                        PairingScreen(
+                            onPaired = { ssid, name, pin ->
+                                val secret = deriveSecret(pin)
+                                val vehicle = Vehicle(ssid = ssid, name = name, sharedSecret = secret)
+                                prefs.addVehicle(vehicle)
+                                vehicles = prefs.vehicles
+                                restartMonitoring()
+                                screen = Screen.VehicleList
+                            },
+                            onCancel = if (vehicles.isNotEmpty()) {
+                                { screen = Screen.VehicleList }
+                            } else null
+                        )
+                    }
+                    is Screen.Status -> {
+                        val vehicle = s.vehicle
+                        val isThisConnected = isConnected && connectedSsid == vehicle.ssid
+                        val status = CompanionStatus(
+                            connected = isThisConnected,
+                            sharingTime = true,
+                            sharingGps = true,
+                            sharingBattery = true,
+                            socks5Active = isThisConnected && isSocks5Active,
+                            ssid = vehicle.ssid
+                        )
+                        var socks5Enabled by remember(vehicle.id) {
+                            mutableStateOf(vehicle.socks5Enabled)
                         }
-                    )
+
+                        StatusScreen(
+                            vehicleName = vehicle.name,
+                            status = status,
+                            socks5Enabled = socks5Enabled,
+                            onSocks5Toggle = {
+                                socks5Enabled = it
+                                prefs.updateVehicle(vehicle.id) { v -> v.copy(socks5Enabled = it) }
+                            },
+                            onUnpair = {
+                                prefs.removeVehicle(vehicle.id)
+                                vehicles = prefs.vehicles
+                                restartMonitoring()
+                                screen = if (vehicles.isEmpty()) Screen.Pairing else Screen.VehicleList
+                            },
+                            onBack = { screen = Screen.VehicleList }
+                        )
+                    }
                 }
             }
         }
@@ -94,16 +137,27 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun deriveAndStoreSecret(pin: String) {
+    private fun deriveSecret(pin: String): String {
         val material = "$pin:openauto-companion-v1"
         val digest = MessageDigest.getInstance("SHA-256")
-        val secret = digest.digest(material.toByteArray()).joinToString("") { "%02x".format(it) }
-        prefs.sharedSecret = secret
+        return digest.digest(material.toByteArray()).joinToString("") { "%02x".format(it) }
     }
 
     private fun startMonitoringIfPaired() {
         if (prefs.isPaired) {
-            (application as CompanionApp).startWifiMonitor(prefs.sharedSecret, prefs.targetSsid)
+            (application as CompanionApp).startWifiMonitor(prefs.vehicles)
         }
     }
+
+    private fun restartMonitoring() {
+        if (prefs.isPaired) {
+            (application as CompanionApp).startWifiMonitor(prefs.vehicles)
+        }
+    }
+}
+
+private sealed class Screen {
+    data object VehicleList : Screen()
+    data object Pairing : Screen()
+    data class Status(val vehicle: Vehicle) : Screen()
 }

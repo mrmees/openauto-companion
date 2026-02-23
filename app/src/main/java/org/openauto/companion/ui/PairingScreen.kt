@@ -10,7 +10,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun PairingScreen(onPaired: (pin: String) -> Unit) {
+fun PairingScreen(
+    suggestedSsid: String = "",
+    onPaired: (ssid: String, name: String, pin: String) -> Unit,
+    onCancel: (() -> Unit)? = null
+) {
+    var ssid by remember { mutableStateOf(suggestedSsid) }
+    var name by remember { mutableStateOf("") }
     var pin by remember { mutableStateOf("") }
 
     Column(
@@ -20,10 +26,32 @@ fun PairingScreen(onPaired: (pin: String) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("Pair with Head Unit", style = MaterialTheme.typography.headlineMedium)
+        Text("Add Vehicle", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Enter the 6-digit PIN shown on your head unit's settings screen.")
+        Text("Enter the WiFi SSID and 6-digit PIN shown on your head unit's settings screen.")
         Spacer(modifier = Modifier.height(32.dp))
+
+        OutlinedTextField(
+            value = ssid,
+            onValueChange = { ssid = it },
+            label = { Text("WiFi SSID") },
+            placeholder = { Text("e.g. OpenAutoProdigy-A3F2") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text("Vehicle Name (optional)") },
+            placeholder = { Text("e.g. Miata") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = pin,
@@ -36,11 +64,18 @@ fun PairingScreen(onPaired: (pin: String) -> Unit) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = { onPaired(pin) },
-            enabled = pin.length == 6
-        ) {
-            Text("Pair")
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (onCancel != null) {
+                TextButton(onClick = onCancel) {
+                    Text("Cancel")
+                }
+            }
+            Button(
+                onClick = { onPaired(ssid.trim(), name.trim().ifEmpty { ssid.trim() }, pin) },
+                enabled = pin.length == 6 && ssid.trim().isNotEmpty()
+            ) {
+                Text("Pair")
+            }
         }
     }
 }
