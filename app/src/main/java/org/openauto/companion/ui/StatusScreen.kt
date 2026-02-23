@@ -1,6 +1,8 @@
 package org.openauto.companion.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,8 +34,10 @@ fun StatusScreen(
             .padding(24.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = onBack) { Text("\u2190") }
-            Spacer(modifier = Modifier.width(8.dp))
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+            }
+            Spacer(modifier = Modifier.width(4.dp))
             Text(vehicleName, style = MaterialTheme.typography.headlineMedium)
         }
         Spacer(modifier = Modifier.height(24.dp))

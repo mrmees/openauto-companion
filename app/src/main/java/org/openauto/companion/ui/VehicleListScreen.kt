@@ -1,15 +1,23 @@
 package org.openauto.companion.ui
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
+import org.openauto.companion.R
 import org.openauto.companion.data.Vehicle
 
 @Composable
@@ -25,7 +33,29 @@ fun VehicleListScreen(
             .fillMaxSize()
             .padding(24.dp)
     ) {
-        Text("OpenAuto Companion", style = MaterialTheme.typography.headlineMedium)
+        val context = LocalContext.current
+        var tapTimes by remember { mutableStateOf(listOf<Long>()) }
+
+        Spacer(modifier = Modifier.height(32.dp))
+        Image(
+            painter = painterResource(R.drawable.prodigy_logo),
+            contentDescription = "Prodigy",
+            modifier = Modifier
+                .size(120.dp)
+                .align(Alignment.CenterHorizontally)
+                .clickable {
+                    val now = System.currentTimeMillis()
+                    tapTimes = (tapTimes + now).filter { now - it < 2000 }
+                    if (tapTimes.size >= 5) {
+                        tapTimes = emptyList()
+                        context.startActivity(Intent(Intent.ACTION_VIEW,
+                            Uri.parse("https://www.youtube.com/watch?v=gbyvvc6n2Oo")))
+                    }
+                }
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text("OpenAuto Prodigy", style = MaterialTheme.typography.headlineMedium,
+            modifier = Modifier.align(Alignment.CenterHorizontally))
         Spacer(modifier = Modifier.height(24.dp))
 
         LazyColumn(
@@ -52,6 +82,8 @@ fun VehicleListScreen(
         ) {
             Text("Add Vehicle")
         }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -92,9 +124,12 @@ private fun VehicleRow(
                 }
             }
 
-            TextButton(onClick = { showDeleteDialog = true }) {
-                Text("Remove", color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall)
+            IconButton(onClick = { showDeleteDialog = true }) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = "Remove vehicle",
+                    tint = MaterialTheme.colorScheme.error
+                )
             }
         }
     }

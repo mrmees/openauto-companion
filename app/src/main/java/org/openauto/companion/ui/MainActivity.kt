@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.MaterialTheme
@@ -65,6 +66,9 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     is Screen.Pairing -> {
+                        if (vehicles.isNotEmpty()) {
+                            BackHandler { screen = Screen.VehicleList }
+                        }
                         PairingScreen(
                             onPaired = { ssid, name, pin ->
                                 val secret = deriveSecret(pin)
@@ -80,6 +84,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     is Screen.Status -> {
+                        BackHandler { screen = Screen.VehicleList }
                         val vehicle = s.vehicle
                         val isThisConnected = isConnected && connectedSsid == vehicle.ssid
                         val status = CompanionStatus(
