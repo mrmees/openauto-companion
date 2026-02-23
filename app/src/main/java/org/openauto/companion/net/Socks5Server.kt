@@ -97,12 +97,25 @@ class Socks5Server(
                 }
             }
 
-            // Greeting: client sends VER NMETHODS METHODS
-            val greeting = ByteArray(3)
-            if (input.read(greeting) < 3) return
-            if (greeting[0] != 0x05.toByte()) return
+            // Greeting: client sends VER NMETHODS METHODS[NMETHODS]
+            val ver = input.read()
+            if (ver != 0x05) return
+            val nmethods = input.read()
+            if (nmethods < 1) return
+            val methods = ByteArray(nmethods)
+            var read = 0
+            while (read < nmethods) {
+                val n = input.read(methods, read, nmethods - read)
+                if (n < 0) return
+                read += n
+            }
 
             // We require username/password auth (0x02)
+            if (!methods.contains(0x02.toByte())) {
+                output.write(byteArrayOf(0x05, 0xFF.toByte())) // no acceptable method
+                output.flush()
+                return
+            }
             output.write(byteArrayOf(0x05, 0x02))
             output.flush()
 

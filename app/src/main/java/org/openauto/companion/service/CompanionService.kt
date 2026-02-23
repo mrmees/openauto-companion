@@ -3,6 +3,7 @@ package org.openauto.companion.service
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
+import android.net.ConnectivityManager
 import android.os.BatteryManager
 import android.content.Intent
 import android.content.IntentFilter
@@ -15,8 +16,10 @@ import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import org.openauto.companion.CompanionApp
+import org.openauto.companion.data.CompanionPrefs
 import org.openauto.companion.net.PiConnection
 import org.openauto.companion.net.Protocol
+import org.openauto.companion.net.Socks5Server
 import org.openauto.companion.ui.MainActivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +35,7 @@ class CompanionService : Service() {
     private val executor = Executors.newSingleThreadScheduledExecutor()
     private var pushTask: ScheduledFuture<*>? = null
     private val seq = AtomicInteger(0)
+    private var socks5Server: Socks5Server? = null
 
     private var lastLocation: Location? = null
     private var locationManager: LocationManager? = null
@@ -61,6 +65,7 @@ class CompanionService : Service() {
                 connection = conn
                 _connected.value = true
                 Log.i(TAG, "Connection established, _connected = true")
+                startSocks5(secret)
                 updateNotification("Connected to OpenAuto Prodigy")
                 startPushLoop()
             } else {
@@ -117,7 +122,7 @@ class CompanionService : Service() {
                     batteryLevel = batteryLevel,
                     batteryCharging = charging,
                     socks5Port = 1080,
-                    socks5Active = false  // TODO: wire to SOCKS5 service state
+                    socks5Active = socks5Server?.isActive ?: false
                 )
 
                 conn.sendStatus(status)
@@ -125,6 +130,31 @@ class CompanionService : Service() {
                 Log.e(TAG, "Push failed", e)
             }
         }, 0, 5, TimeUnit.SECONDS)
+    }
+
+    private fun startSocks5(secret: String) {
+        val prefs = CompanionPrefs(this)
+        if (!prefs.socks5Enabled) {
+            Log.i(TAG, "SOCKS5 proxy disabled in preferences")
+            return
+        }
+        try {
+            val cm = getSystemService(ConnectivityManager::class.java)
+            // Use "oap" + first 8 chars of secret as credentials
+            val user = "oap"
+            val pass = if (secret.length >= 8) secret.substring(0, 8) else secret
+            socks5Server = Socks5Server(
+                port = 1080,
+                username = user,
+                password = pass,
+                connectivityManager = cm
+            )
+            socks5Server!!.start()
+            Log.i(TAG, "SOCKS5 proxy started on port 1080 (user=$user)")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start SOCKS5 proxy", e)
+            socks5Server = null
+        }
     }
 
     private fun startLocationUpdates() {
@@ -168,6 +198,8 @@ class CompanionService : Service() {
     override fun onDestroy() {
         _connected.value = false
         pushTask?.cancel(false)
+        socks5Server?.stop()
+        socks5Server = null
         executor.execute {
             connection?.disconnect()
         }
