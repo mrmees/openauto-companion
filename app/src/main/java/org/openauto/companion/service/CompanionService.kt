@@ -101,6 +101,7 @@ class CompanionService : Service() {
                 updateNotification("Connected to $vehicleName")
                 startPushLoop()
             } else {
+                Log.w(TAG, "Connection attempt failed: ${conn.lastFailureReason ?: "unknown reason"}")
                 updateNotification("Connection failed — retrying...")
                 retryTask = executor.schedule({
                     attemptConnection(secret, vehicleName, socks5Enabled, audioKeepAlive)

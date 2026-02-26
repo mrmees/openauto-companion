@@ -1,6 +1,7 @@
 package org.openauto.companion.ui
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import android.content.pm.PackageManager
@@ -175,9 +176,9 @@ class MainActivity : ComponentActivity() {
                             onOpenSettingsPage = {
                                 val url = SettingsUrlBuilder.build(vehicle.settingsHost, vehicle.settingsPort)
                                 val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                if (intent.resolveActivity(packageManager) != null) {
+                                try {
                                     startActivity(intent)
-                                } else {
+                                } catch (_: ActivityNotFoundException) {
                                     Toast.makeText(
                                         this,
                                         "No browser app available to open settings.",
