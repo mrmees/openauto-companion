@@ -28,6 +28,23 @@ OpenAuto Companion is an Android app that securely connects a phone to an OpenAu
 - Runtime service depends on location, Wi-Fi, and foreground-service constraints.
 - Solo-maintained project: process must remain lightweight.
 
+## Product Boundary Policy
+
+- This repository is responsible only for the Prodigy Companion Android app.
+- Prodigy head unit app changes are out of scope for this repository and are developed separately.
+- If a Companion feature depends on head-unit behavior, it must be tracked in `Blocked by Head Unit` before work proceeds past the dependency boundary.
+
+## Blocked by Head Unit
+
+Use this schema for every dependency:
+- `Need`:
+- `Why`:
+- `Companion impact`:
+- `Status`: `Open` | `Requested` | `In Progress` | `Delivered` | `Not Needed`
+
+Current blockers:
+- None.
+
 ## Non-Goals
 
 - Building a full backend/cloud service for pairing or account management.
@@ -39,3 +56,4 @@ OpenAuto Companion is an Android app that securely connects a phone to an OpenAu
 - 2026-02-26: Added QR pairing endpoint capture and status-screen settings-page launch.
 - 2026-02-26: Added socket binding fallback for EPERM and mapped settings open action to web socket port `8080`.
 - 2026-02-26: Established balanced project management system (`project-vision`, `roadmap-current`, `session-handoffs`).
+- 2026-02-26: Established canonical companion/head-unit boundary policy and `Blocked by Head Unit` tracking model.
