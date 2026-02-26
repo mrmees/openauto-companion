@@ -1,0 +1,52 @@
+# Session Handoffs
+
+## Purpose
+
+This file preserves continuity across work sessions.
+
+## When Entries Are Required
+
+Add an entry for every behavior-changing session.
+
+Behavior-changing work includes:
+- New or modified runtime behavior
+- Changes to pairing, connection, networking, or status UX logic
+- Any update that could alter user-facing behavior or protocol/runtime semantics
+
+Non-behavior work (formatting, docs-only edits, no-op refactors) does not require an entry unless risk is meaningful.
+
+## Entry Template
+
+```markdown
+## YYYY-MM-DD HH:MM (local)
+
+- What changed:
+- Why:
+- Status: done | in progress | blocked
+- Next steps:
+  - 1)
+  - 2)
+  - 3)
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS/FAIL
+  - Additional checks (if any)
+```
+
+---
+
+## 2026-02-26 14:34 (local)
+
+- What changed:
+  - Established isolated worktree on branch `chore/project-management-setup`.
+  - Added balanced management-system design and implementation plan docs.
+  - Added project-level worktree ignore rule (`.worktrees/`) to repository `.gitignore`.
+- Why:
+  - Create a reliable, low-overhead workflow for maintaining design vision and continuity across sessions.
+- Status: done
+- Next steps:
+  - 1) Add `project-vision.md` and `roadmap-current.md`.
+  - 2) Encode workflow contract in `AGENTS.md`.
+  - 3) Run final verification gate and append completion handoff.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS (BUILD SUCCESSFUL in worktree baseline)
+  - `git worktree add .worktrees/project-management-setup -b chore/project-management-setup` -> PASS
