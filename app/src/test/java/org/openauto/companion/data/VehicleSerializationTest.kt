@@ -7,7 +7,8 @@ class VehicleSerializationTest {
     @Test
     fun roundTrip_singleVehicle() {
         val v = Vehicle(id = "abc123", ssid = "MiataAA-A3F2", name = "Miata",
-            sharedSecret = "deadbeef", socks5Enabled = true)
+            sharedSecret = "deadbeef", socks5Enabled = true,
+            settingsHost = "10.0.0.1", settingsPort = 8080)
         val json = Vehicle.listToJson(listOf(v))
         val result = Vehicle.listFromJson(json)
         assertEquals(1, result.size)
@@ -16,6 +17,8 @@ class VehicleSerializationTest {
         assertEquals("Miata", result[0].name)
         assertEquals("deadbeef", result[0].sharedSecret)
         assertTrue(result[0].socks5Enabled)
+        assertEquals("10.0.0.1", result[0].settingsHost)
+        assertEquals(8080, result[0].settingsPort)
     }
 
     @Test
@@ -39,6 +42,16 @@ class VehicleSerializationTest {
         }
         val v = Vehicle.fromJson(json)
         assertEquals("TestAP", v.name)
+        assertNull(v.settingsHost)
+        assertNull(v.settingsPort)
+    }
+
+    @Test
+    fun roundTrip_endpointFieldsRemainNullWhenUnset() {
+        val v = Vehicle(id = "null1", ssid = "NullAP", sharedSecret = "s")
+        val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v)))
+        assertNull(result[0].settingsHost)
+        assertNull(result[0].settingsPort)
     }
 
     @Test

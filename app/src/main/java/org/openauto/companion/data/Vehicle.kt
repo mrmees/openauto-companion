@@ -10,7 +10,9 @@ data class Vehicle(
     val name: String = ssid,
     val sharedSecret: String,
     val socks5Enabled: Boolean = true,
-    val audioKeepAlive: Boolean = false
+    val audioKeepAlive: Boolean = false,
+    val settingsHost: String? = null,
+    val settingsPort: Int? = null
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -19,6 +21,8 @@ data class Vehicle(
         put("shared_secret", sharedSecret)
         put("socks5_enabled", socks5Enabled)
         put("audio_keep_alive", audioKeepAlive)
+        if (!settingsHost.isNullOrBlank()) put("settings_host", settingsHost)
+        if (settingsPort != null) put("settings_port", settingsPort)
     }
 
     companion object {
@@ -28,7 +32,9 @@ data class Vehicle(
             name = json.optString("name", json.getString("ssid")),
             sharedSecret = json.getString("shared_secret"),
             socks5Enabled = json.optBoolean("socks5_enabled", true),
-            audioKeepAlive = json.optBoolean("audio_keep_alive", false)
+            audioKeepAlive = json.optBoolean("audio_keep_alive", false),
+            settingsHost = json.optString("settings_host", "").ifBlank { null },
+            settingsPort = if (json.has("settings_port")) json.optInt("settings_port") else null
         )
 
         fun listToJson(vehicles: List<Vehicle>): String =
