@@ -26,6 +26,7 @@ import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
+import android.util.Size
 import java.util.concurrent.Executors
 
 private const val TAG = "QrScanScreen"
@@ -150,6 +151,7 @@ private fun CameraPreviewWithScanner(
 
                 val imageAnalysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setTargetResolution(Size(1280, 720))
                     .build()
 
                 imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
@@ -184,6 +186,8 @@ private fun CameraPreviewWithScanner(
     )
 }
 
+private var frameCount = 0L
+
 @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
 private fun processFrame(
     imageProxy: ImageProxy,
@@ -196,13 +200,27 @@ private fun processFrame(
         return
     }
 
+    frameCount++
+    if (frameCount % 30 == 0L) {
+        Log.d(TAG, "Analyzed $frameCount frames, rotation=${imageProxy.imageInfo.rotationDegrees}, " +
+                "size=${mediaImage.width}x${mediaImage.height}")
+    }
+
     val inputImage = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
     scanner.process(inputImage)
         .addOnSuccessListener { barcodes ->
+            if (barcodes.isNotEmpty()) {
+                Log.i(TAG, "ML Kit found ${barcodes.size} barcode(s)")
+            }
             for (barcode in barcodes) {
-                val rawValue = barcode.rawValue ?: continue
-                if (!rawValue.startsWith("openauto://pair?")) continue
+                val rawValue = barcode.rawValue
+                Log.i(TAG, "Barcode raw: $rawValue format=${barcode.format} type=${barcode.valueType}")
+                if (rawValue == null) continue
+                if (!rawValue.startsWith("openauto://pair?")) {
+                    Log.w(TAG, "QR content doesn't match openauto:// scheme: $rawValue")
+                    continue
+                }
 
                 val uri = Uri.parse(rawValue)
                 val pin = uri.getQueryParameter("pin")
@@ -212,6 +230,8 @@ private fun processFrame(
                     Log.i(TAG, "QR scanned: ssid=$ssid")
                     onResult(ssid, pin)
                     break
+                } else {
+                    Log.w(TAG, "QR missing pin=$pin or ssid=$ssid")
                 }
             }
         }

@@ -8,7 +8,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,10 +53,32 @@ class MainActivity : ComponentActivity() {
                 val isAudioKeepAliveActive by CompanionService.audioKeepAliveActive.collectAsStateWithLifecycle()
                 val connectedVehicleName by CompanionService.vehicleName.collectAsStateWithLifecycle()
 
+                var showPairingSuccess by remember { mutableStateOf<String?>(null) }
+
                 // Determine which SSID is currently connected (by matching vehicle name back)
                 val connectedSsid = if (isConnected) {
                     vehicles.find { it.name == connectedVehicleName }?.ssid
                 } else null
+
+                showPairingSuccess?.let { ssid ->
+                    AlertDialog(
+                        onDismissRequest = { showPairingSuccess = null },
+                        icon = {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        },
+                        title = { Text("Pairing Successful") },
+                        text = { Text("Vehicle \"$ssid\" has been paired. The app will connect automatically when in range.") },
+                        confirmButton = {
+                            TextButton(onClick = { showPairingSuccess = null }) {
+                                Text("OK")
+                            }
+                        }
+                    )
+                }
 
                 when (val s = screen) {
                     is Screen.VehicleList -> {
@@ -78,6 +106,7 @@ class MainActivity : ComponentActivity() {
                                 vehicles = prefs.vehicles
                                 restartMonitoring()
                                 screen = Screen.VehicleList
+                                showPairingSuccess = name
                             },
                             onCancel = if (vehicles.isNotEmpty()) {
                                 { screen = Screen.VehicleList }
@@ -95,6 +124,7 @@ class MainActivity : ComponentActivity() {
                                 vehicles = prefs.vehicles
                                 restartMonitoring()
                                 screen = Screen.VehicleList
+                                showPairingSuccess = ssid
                             },
                             onCancel = { screen = Screen.Pairing }
                         )
