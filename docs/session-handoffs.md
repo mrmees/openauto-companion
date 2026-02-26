@@ -50,3 +50,20 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 - Verification:
   - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS (BUILD SUCCESSFUL in worktree baseline)
   - `git worktree add .worktrees/project-management-setup -b chore/project-management-setup` -> PASS
+
+## 2026-02-26 14:37 (local)
+
+- What changed:
+  - Added `docs/project-vision.md` as stable direction source of truth.
+  - Added `docs/roadmap-current.md` with `Now / Next / Later / Deferred` priorities.
+  - Added local `AGENTS.md` workflow contract enforcing vision check, roadmap updates, verification gate, and behavior-change handoffs.
+- Why:
+  - Ensure design intent stays current across sessions with minimal process overhead for a solo development workflow.
+- Status: done
+- Next steps:
+  - 1) Use this loop for the next behavior-changing feature task from intake through handoff.
+  - 2) Keep `roadmap-current.md` updated whenever sequencing changes.
+  - 3) Add CI enforcement of verification gate when ready.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS (BUILD SUCCESSFUL)
+  - `rg -n "Project Management Loop|project-vision|roadmap-current|session-handoffs" AGENTS.md` -> PASS
