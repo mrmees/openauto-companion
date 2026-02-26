@@ -117,9 +117,15 @@ class MainActivity : ComponentActivity() {
                     is Screen.QrScan -> {
                         BackHandler { screen = Screen.Pairing }
                         QrScanScreen(
-                            onScanned = { ssid, pin ->
+                            onScanned = { ssid, pin, host, port ->
                                 val secret = deriveSecret(pin)
-                                val vehicle = Vehicle(ssid = ssid, name = ssid, sharedSecret = secret)
+                                val vehicle = Vehicle(
+                                    ssid = ssid,
+                                    name = ssid,
+                                    sharedSecret = secret,
+                                    settingsHost = host,
+                                    settingsPort = port
+                                )
                                 prefs.addVehicle(vehicle)
                                 vehicles = prefs.vehicles
                                 restartMonitoring()

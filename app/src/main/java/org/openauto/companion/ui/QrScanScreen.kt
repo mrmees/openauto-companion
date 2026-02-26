@@ -33,7 +33,7 @@ private const val TAG = "QrScanScreen"
 
 @Composable
 fun QrScanScreen(
-    onScanned: (ssid: String, pin: String) -> Unit,
+    onScanned: (ssid: String, pin: String, host: String?, port: Int?) -> Unit,
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
@@ -115,7 +115,7 @@ fun QrScanScreen(
 
 @Composable
 private fun CameraPreviewWithScanner(
-    onScanned: (ssid: String, pin: String) -> Unit,
+    onScanned: (ssid: String, pin: String, host: String?, port: Int?) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -159,10 +159,10 @@ private fun CameraPreviewWithScanner(
                         imageProxy.close()
                         return@setAnalyzer
                     }
-                    processFrame(imageProxy, scanner) { ssid, pin ->
+                    processFrame(imageProxy, scanner) { ssid, pin, host, port ->
                         if (!scanComplete) {
                             scanComplete = true
-                            onScanned(ssid, pin)
+                            onScanned(ssid, pin, host, port)
                         }
                     }
                 }
@@ -192,7 +192,7 @@ private var frameCount = 0L
 private fun processFrame(
     imageProxy: ImageProxy,
     scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
-    onResult: (ssid: String, pin: String) -> Unit
+    onResult: (ssid: String, pin: String, host: String?, port: Int?) -> Unit
 ) {
     val mediaImage = imageProxy.image
     if (mediaImage == null) {
@@ -220,7 +220,7 @@ private fun processFrame(
                 val payload = PairingUriParser.parse(rawValue)
                 if (payload != null) {
                     Log.i(TAG, "QR scanned: ssid=${payload.ssid}")
-                    onResult(payload.ssid, payload.pin)
+                    onResult(payload.ssid, payload.pin, payload.host, payload.port)
                     break
                 }
                 Log.w(TAG, "QR payload invalid: $rawValue")
