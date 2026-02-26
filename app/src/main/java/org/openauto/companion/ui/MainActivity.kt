@@ -1,9 +1,12 @@
 package org.openauto.companion.ui
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -21,6 +24,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.openauto.companion.CompanionApp
 import org.openauto.companion.data.CompanionPrefs
 import org.openauto.companion.data.Vehicle
+import org.openauto.companion.net.SettingsUrlBuilder
 import org.openauto.companion.service.CompanionService
 import java.security.MessageDigest
 
@@ -167,6 +171,19 @@ class MainActivity : ComponentActivity() {
                             onAudioKeepAliveToggle = {
                                 audioKeepAlive = it
                                 prefs.updateVehicle(vehicle.id) { v -> v.copy(audioKeepAlive = it) }
+                            },
+                            onOpenSettingsPage = {
+                                val url = SettingsUrlBuilder.build(vehicle.settingsHost, vehicle.settingsPort)
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                if (intent.resolveActivity(packageManager) != null) {
+                                    startActivity(intent)
+                                } else {
+                                    Toast.makeText(
+                                        this,
+                                        "No browser app available to open settings.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
                             },
                             onUnpair = {
                                 prefs.removeVehicle(vehicle.id)

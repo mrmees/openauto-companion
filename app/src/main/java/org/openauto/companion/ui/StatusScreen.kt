@@ -28,6 +28,7 @@ fun StatusScreen(
     onSocks5Toggle: (Boolean) -> Unit,
     audioKeepAlive: Boolean,
     onAudioKeepAliveToggle: (Boolean) -> Unit,
+    onOpenSettingsPage: () -> Unit,
     onUnpair: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -60,6 +61,16 @@ fun StatusScreen(
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(if (status.connected) "Connected" else "Waiting for ${status.ssid}...")
             }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Button(
+            onClick = onOpenSettingsPage,
+            enabled = status.connected,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Open Settings Page")
         }
 
         Spacer(modifier = Modifier.height(16.dp))
