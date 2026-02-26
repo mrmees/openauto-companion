@@ -26,6 +26,9 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 - Dependency decision:
   - Companion-only: Yes/No
   - If No, reference `Blocked by Head Unit` entry
+- Wishlist promotion:
+  - Source item: <title or n/a>
+  - Promotion result: Promoted / Not promoted
 - Next steps:
   - 1)
   - 2)
