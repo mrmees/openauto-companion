@@ -2,7 +2,6 @@ package org.openauto.companion.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +26,7 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import android.util.Size
+import org.openauto.companion.net.PairingUriParser
 import java.util.concurrent.Executors
 
 private const val TAG = "QrScanScreen"
@@ -217,22 +217,13 @@ private fun processFrame(
                 val rawValue = barcode.rawValue
                 Log.i(TAG, "Barcode raw: $rawValue format=${barcode.format} type=${barcode.valueType}")
                 if (rawValue == null) continue
-                if (!rawValue.startsWith("openauto://pair?")) {
-                    Log.w(TAG, "QR content doesn't match openauto:// scheme: $rawValue")
-                    continue
-                }
-
-                val uri = Uri.parse(rawValue)
-                val pin = uri.getQueryParameter("pin")
-                val ssid = uri.getQueryParameter("ssid")
-
-                if (pin != null && ssid != null) {
-                    Log.i(TAG, "QR scanned: ssid=$ssid")
-                    onResult(ssid, pin)
+                val payload = PairingUriParser.parse(rawValue)
+                if (payload != null) {
+                    Log.i(TAG, "QR scanned: ssid=${payload.ssid}")
+                    onResult(payload.ssid, payload.pin)
                     break
-                } else {
-                    Log.w(TAG, "QR missing pin=$pin or ssid=$ssid")
                 }
+                Log.w(TAG, "QR payload invalid: $rawValue")
             }
         }
         .addOnFailureListener { e ->
