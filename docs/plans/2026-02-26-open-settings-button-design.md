@@ -48,3 +48,27 @@ On button tap:
 - No global app settings screen for endpoint overrides
 - No duplicate button on vehicle list screen
 - No additional permissions
+
+## Implemented
+
+Implemented on 2026-02-26 with:
+
+- `Vehicle` persistence for `settingsHost` / `settingsPort`
+- QR URI parsing via `PairingUriParser` and storage during QR pairing
+- URL assembly via `SettingsUrlBuilder` with fallback `http://10.0.0.1:8080`
+- Full-width `Open Settings Page` button in `StatusScreen` directly under the connection card
+- Button enabled only when connected
+- Browser launch from `MainActivity` with no-browser toast fallback
+
+## Verification Evidence
+
+Commands run:
+
+```bash
+./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.data.VehicleSerializationTest"
+./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.PairingUriParserTest"
+./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.SettingsUrlBuilderTest"
+./gradlew :app:testDebugUnitTest :app:assembleDebug
+```
+
+All commands completed successfully.
