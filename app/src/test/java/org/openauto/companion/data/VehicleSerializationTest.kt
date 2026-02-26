@@ -47,6 +47,18 @@ class VehicleSerializationTest {
     }
 
     @Test
+    fun fromJson_generatesStableIdFromSsidWhenMissing() {
+        val json = org.json.JSONObject().apply {
+            put("ssid", "BridgeAP")
+            put("shared_secret", "abc")
+        }
+        val first = Vehicle.fromJson(json).id
+        val second = Vehicle.fromJson(json).id
+        assertEquals("Stable id should be deterministic by SSID", first, second)
+        assertFalse(first.isBlank())
+    }
+
+    @Test
     fun roundTrip_endpointFieldsRemainNullWhenUnset() {
         val v = Vehicle(id = "null1", ssid = "NullAP", sharedSecret = "s")
         val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v)))

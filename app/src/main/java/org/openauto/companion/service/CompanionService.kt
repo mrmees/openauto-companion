@@ -39,6 +39,7 @@ class CompanionService : Service() {
     private var silentPlayer: SilentAudioPlayer? = null
     private var connecting = false
     private var _currentVehicleName = "OpenAuto Prodigy"
+    private var _currentVehicleKey = ""
 
     private var lastLocation: Location? = null
     private var locationManager: LocationManager? = null
@@ -61,14 +62,30 @@ class CompanionService : Service() {
             return START_STICKY
         }
 
+        val vehicleId = intent?.getStringExtra("vehicle_id")?.trim().orEmpty()
+        val vehicleSsid = intent?.getStringExtra("vehicle_ssid")?.trim().orEmpty()
+        val vehicleIdentity = VehicleIdentity.resolve(vehicleId, vehicleSsid)
         val secret = intent?.getStringExtra("shared_secret") ?: ""
         val vehicleName = intent?.getStringExtra("vehicle_name") ?: "OpenAuto Prodigy"
         val socks5EnabledOverride = intent?.getBooleanExtra("socks5_enabled", true) ?: true
         val audioKeepAlive = intent?.getBooleanExtra("audio_keep_alive", false) ?: false
         _vehicleName.value = vehicleName
+        _vehicleId.value = vehicleIdentity
         startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
 
         startLocationUpdates()
+
+        val isSameVehicle = _currentVehicleKey == vehicleIdentity
+
+        if ((_connected.value || connecting) && !isSameVehicle) {
+            Log.i(TAG, "onStartCommand: switching connection target from '$_currentVehicleKey' to '$vehicleIdentity'")
+            clearConnectionState()
+            _currentVehicleKey = vehicleIdentity
+            _currentVehicleName = vehicleName
+            connecting = true
+            attemptConnection(vehicleIdentity, secret, vehicleName, socks5EnabledOverride, audioKeepAlive)
+            return START_STICKY
+        }
 
         // Already connected or mid-connection — don't start another attempt
         if (_connected.value || connecting) {
@@ -78,19 +95,37 @@ class CompanionService : Service() {
         }
 
         _currentVehicleName = vehicleName
+        _currentVehicleKey = vehicleIdentity
         connecting = true
-        attemptConnection(secret, vehicleName, socks5EnabledOverride, audioKeepAlive)
+        attemptConnection(vehicleIdentity, secret, vehicleName, socks5EnabledOverride, audioKeepAlive)
 
         return START_STICKY
     }
 
-    private fun attemptConnection(secret: String, vehicleName: String, socks5Enabled: Boolean, audioKeepAlive: Boolean = false) {
+    private fun attemptConnection(
+        vehicleIdentity: String,
+        secret: String,
+        vehicleName: String,
+        socks5Enabled: Boolean,
+        audioKeepAlive: Boolean = false
+    ) {
         retryTask?.cancel(false)
         executor.execute {
+            if (_currentVehicleKey != vehicleIdentity) {
+                Log.i(TAG, "Skipping stale connect attempt for '$vehicleIdentity'")
+                return@execute
+            }
+
             val wifiNetwork = (application as org.openauto.companion.CompanionApp).wifiMonitor?.getWifiNetwork()
             Log.i(TAG, "WiFi network for binding: $wifiNetwork")
             val conn = PiConnection(sharedSecret = secret, wifiNetwork = wifiNetwork)
             if (conn.connect()) {
+                if (_currentVehicleKey != vehicleIdentity) {
+                    Log.i(TAG, "Connection succeeded for stale attempt '$vehicleIdentity', dropping")
+                    conn.disconnect()
+                    return@execute
+                }
+
                 connection = conn
                 connecting = false
                 _connected.value = true
@@ -101,10 +136,14 @@ class CompanionService : Service() {
                 updateNotification("Connected to $vehicleName")
                 startPushLoop()
             } else {
+                if (_currentVehicleKey != vehicleIdentity) {
+                    return@execute
+                }
+
                 Log.w(TAG, "Connection attempt failed: ${conn.lastFailureReason ?: "unknown reason"}")
                 updateNotification("Connection failed — retrying...")
                 retryTask = executor.schedule({
-                    attemptConnection(secret, vehicleName, socks5Enabled, audioKeepAlive)
+                    attemptConnection(vehicleIdentity, secret, vehicleName, socks5Enabled, audioKeepAlive)
                 }, 10, TimeUnit.SECONDS)
             }
         }
@@ -184,6 +223,28 @@ class CompanionService : Service() {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start SOCKS5 proxy", e)
             socks5Server = null
+        }
+    }
+
+    private fun clearConnectionState() {
+        retryTask?.cancel(false)
+        retryTask = null
+        pushTask?.cancel(false)
+        pushTask = null
+        connecting = false
+        _connected.value = false
+        _socks5Active.value = false
+        _audioKeepAliveActive.value = false
+
+        socks5Server?.stop()
+        socks5Server = null
+        silentPlayer?.stop()
+        silentPlayer = null
+
+        val previousConnection = connection
+        connection = null
+        executor.execute {
+            previousConnection?.disconnect()
         }
     }
 
@@ -269,19 +330,11 @@ class CompanionService : Service() {
 
     override fun onDestroy() {
         _connected.value = false
+        clearConnectionState()
         connecting = false
-        _socks5Active.value = false
-        _audioKeepAliveActive.value = false
         _vehicleName.value = ""
-        retryTask?.cancel(false)
-        pushTask?.cancel(false)
-        socks5Server?.stop()
-        socks5Server = null
-        silentPlayer?.stop()
-        silentPlayer = null
-        executor.execute {
-            connection?.disconnect()
-        }
+        _vehicleId.value = ""
+        _currentVehicleKey = ""
         locationManager?.removeUpdates(locationListener)
         executor.shutdown()
         super.onDestroy()
@@ -305,5 +358,8 @@ class CompanionService : Service() {
 
         private val _vehicleName = MutableStateFlow("")
         val vehicleName: StateFlow<String> = _vehicleName.asStateFlow()
+
+        private val _vehicleId = MutableStateFlow("")
+        val vehicleId: StateFlow<String> = _vehicleId.asStateFlow()
     }
 }

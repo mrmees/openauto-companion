@@ -20,6 +20,11 @@ class CompanionApp : Application() {
         wifiMonitor = WifiMonitor(this, vehicles).also { it.start() }
     }
 
+    fun stopWifiMonitor() {
+        wifiMonitor?.stop()
+        wifiMonitor = null
+    }
+
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,

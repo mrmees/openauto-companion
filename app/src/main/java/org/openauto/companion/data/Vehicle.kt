@@ -13,7 +13,7 @@ data class Vehicle(
     val audioKeepAlive: Boolean = false,
     val settingsHost: String? = null,
     val settingsPort: Int? = null
-) {
+    ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
         put("ssid", ssid)
@@ -26,8 +26,11 @@ data class Vehicle(
     }
 
     companion object {
+        private fun stableIdForSsid(ssid: String): String =
+            UUID.nameUUIDFromBytes(ssid.toByteArray(Charsets.UTF_8)).toString().take(8)
+
         fun fromJson(json: JSONObject): Vehicle = Vehicle(
-            id = json.optString("id", UUID.randomUUID().toString().take(8)),
+            id = json.optString("id", "").ifBlank { stableIdForSsid(json.getString("ssid")) },
             ssid = json.getString("ssid"),
             name = json.optString("name", json.getString("ssid")),
             sharedSecret = json.getString("shared_secret"),

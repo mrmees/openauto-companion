@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets
 data class PairingPayload(
     val ssid: String,
     val pin: String,
+    val vehicleId: String?,
     val host: String?,
     val port: Int?
 )
@@ -28,6 +29,9 @@ object PairingUriParser {
         if (pin.isNullOrEmpty() || !pin.matches(Regex("\\d{6}"))) return null
         if (ssid.isNullOrEmpty()) return null
 
+        val vehicleId = params["vehicle_id"]?.trim()?.ifBlank { null }
+            ?: params["id"]?.trim()?.ifBlank { null }
+
         val host = params["host"]?.trim()?.ifBlank { null }
         val portRaw = params["port"]?.trim()
         val port = when {
@@ -38,6 +42,7 @@ object PairingUriParser {
         return PairingPayload(
             ssid = ssid,
             pin = pin,
+            vehicleId = vehicleId,
             host = host,
             port = port
         )

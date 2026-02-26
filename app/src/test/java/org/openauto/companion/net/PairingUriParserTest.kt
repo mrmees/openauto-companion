@@ -15,6 +15,25 @@ class PairingUriParserTest {
         assertEquals("CarAP", parsed.ssid)
         assertEquals("10.0.0.1", parsed.host)
         assertEquals(8080, parsed.port)
+        assertNull(parsed.vehicleId)
+    }
+
+    @Test
+    fun parse_acceptsVehicleId() {
+        val parsed = PairingUriParser.parse(
+            "openauto://pair?pin=123456&ssid=CarAP&vehicle_id=veh-001&host=10.0.0.1&port=8080"
+        )
+        requireNotNull(parsed)
+        assertEquals("123456", parsed.pin)
+        assertEquals("CarAP", parsed.ssid)
+        assertEquals("veh-001", parsed.vehicleId)
+    }
+
+    @Test
+    fun parse_acceptsLegacyIdKey() {
+        val parsed = PairingUriParser.parse("openauto://pair?pin=123456&ssid=CarAP&id=legacy-009")
+        requireNotNull(parsed)
+        assertEquals("legacy-009", parsed.vehicleId)
     }
 
     @Test
