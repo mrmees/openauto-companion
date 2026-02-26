@@ -28,6 +28,11 @@ OpenAuto Companion is an Android app that securely connects a phone to an OpenAu
 - Runtime service depends on location, Wi-Fi, and foreground-service constraints.
 - Solo-maintained project: process must remain lightweight.
 
+## Testing Hardware Available
+
+- SSH access is available to the Pi running Prodigy head unit software.
+- ADB debug access is available to the phone running the Companion app.
+
 ## Product Boundary Policy
 
 - This repository is responsible only for the Prodigy Companion Android app.
@@ -63,3 +68,4 @@ Current blockers:
 - 2026-02-26: Added socket binding fallback for EPERM and mapped settings open action to web socket port `8080`.
 - 2026-02-26: Established balanced project management system (`project-vision`, `roadmap-current`, `session-handoffs`).
 - 2026-02-26: Established canonical companion/head-unit boundary policy and `Blocked by Head Unit` tracking model.
+- 2026-02-26: Documented available testing hardware access (Pi over SSH, phone over ADB).
