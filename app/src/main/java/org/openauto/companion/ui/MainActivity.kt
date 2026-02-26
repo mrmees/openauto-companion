@@ -27,6 +27,7 @@ import org.openauto.companion.data.CompanionPrefs
 import org.openauto.companion.data.Vehicle
 import org.openauto.companion.net.SettingsUrlBuilder
 import org.openauto.companion.service.CompanionService
+import org.openauto.companion.service.VehicleIdentity
 import java.security.MessageDigest
 
 class MainActivity : ComponentActivity() {
@@ -57,13 +58,28 @@ class MainActivity : ComponentActivity() {
                 val isSocks5Active by CompanionService.socks5Active.collectAsStateWithLifecycle()
                 val isAudioKeepAliveActive by CompanionService.audioKeepAliveActive.collectAsStateWithLifecycle()
                 val connectedVehicleName by CompanionService.vehicleName.collectAsStateWithLifecycle()
+                val connectedVehicleId by CompanionService.vehicleId.collectAsStateWithLifecycle()
 
                 var showPairingSuccess by remember { mutableStateOf<String?>(null) }
+                var pairingError by remember { mutableStateOf<String?>(null) }
 
-                // Determine which SSID is currently connected (by matching vehicle name back)
-                val connectedSsid = if (isConnected) {
-                    vehicles.find { it.name == connectedVehicleName }?.ssid
+                fun handlePairing(vehicle: Vehicle, displayName: String) {
+                    if (!prefs.addVehicle(vehicle)) {
+                        pairingError = "Vehicle \"$displayName\" is already paired."
+                        return
+                    }
+
+                    vehicles = prefs.vehicles
+                    restartMonitoring()
+                    screen = Screen.VehicleList
+                    showPairingSuccess = displayName
+                }
+
+                val connectedVehicle = if (isConnected) {
+                    vehicles.find { it.id == connectedVehicleId || it.ssid == connectedVehicleId }
                 } else null
+                val connectedSsid = connectedVehicle?.ssid
+                    ?: if (isConnected && connectedVehicleName.isNotBlank()) connectedVehicleName else null
 
                 showPairingSuccess?.let { ssid ->
                     AlertDialog(
@@ -79,6 +95,19 @@ class MainActivity : ComponentActivity() {
                         text = { Text("Vehicle \"$ssid\" has been paired. The app will connect automatically when in range.") },
                         confirmButton = {
                             TextButton(onClick = { showPairingSuccess = null }) {
+                                Text("OK")
+                            }
+                        }
+                    )
+                }
+
+                pairingError?.let { message ->
+                    AlertDialog(
+                        onDismissRequest = { pairingError = null },
+                        title = { Text("Pairing Skipped") },
+                        text = { Text(message) },
+                        confirmButton = {
+                            TextButton(onClick = { pairingError = null }) {
                                 Text("OK")
                             }
                         }
@@ -107,11 +136,7 @@ class MainActivity : ComponentActivity() {
                             onPaired = { ssid, name, pin ->
                                 val secret = deriveSecret(pin)
                                 val vehicle = Vehicle(ssid = ssid, name = name, sharedSecret = secret)
-                                prefs.addVehicle(vehicle)
-                                vehicles = prefs.vehicles
-                                restartMonitoring()
-                                screen = Screen.VehicleList
-                                showPairingSuccess = name
+                                handlePairing(vehicle, name)
                             },
                             onCancel = if (vehicles.isNotEmpty()) {
                                 { screen = Screen.VehicleList }
@@ -122,20 +147,27 @@ class MainActivity : ComponentActivity() {
                     is Screen.QrScan -> {
                         BackHandler { screen = Screen.Pairing }
                         QrScanScreen(
-                            onScanned = { ssid, pin, host, port ->
+                            onScanned = { ssid, pin, vehicleId, host, port ->
                                 val secret = deriveSecret(pin)
-                                val vehicle = Vehicle(
-                                    ssid = ssid,
-                                    name = ssid,
-                                    sharedSecret = secret,
-                                    settingsHost = host,
-                                    settingsPort = port
-                                )
-                                prefs.addVehicle(vehicle)
-                                vehicles = prefs.vehicles
-                                restartMonitoring()
-                                screen = Screen.VehicleList
-                                showPairingSuccess = ssid
+                                val vehicle = if (vehicleId == null) {
+                                    Vehicle(
+                                        ssid = ssid,
+                                        name = ssid,
+                                        sharedSecret = secret,
+                                        settingsHost = host,
+                                        settingsPort = port
+                                    )
+                                } else {
+                                    Vehicle(
+                                        id = vehicleId,
+                                        ssid = ssid,
+                                        name = ssid,
+                                        sharedSecret = secret,
+                                        settingsHost = host,
+                                        settingsPort = port
+                                    )
+                                }
+                                handlePairing(vehicle, ssid)
                             },
                             onCancel = { screen = Screen.Pairing }
                         )
@@ -143,7 +175,8 @@ class MainActivity : ComponentActivity() {
                     is Screen.Status -> {
                         BackHandler { screen = Screen.VehicleList }
                         val vehicle = s.vehicle
-                        val isThisConnected = isConnected && connectedSsid == vehicle.ssid
+                        val isThisConnected = isConnected &&
+                            VehicleIdentity.matches(vehicle.id, vehicle.ssid, connectedVehicleId)
                         val status = CompanionStatus(
                             connected = isThisConnected,
                             sharingTime = true,
@@ -234,8 +267,11 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun restartMonitoring() {
+        val app = application as CompanionApp
         if (prefs.isPaired) {
-            (application as CompanionApp).startWifiMonitor(prefs.vehicles)
+            app.startWifiMonitor(prefs.vehicles)
+        } else {
+            app.stopWifiMonitor()
         }
     }
 }

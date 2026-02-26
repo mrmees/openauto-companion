@@ -18,20 +18,23 @@ class CompanionPrefs(context: Context) {
 
     fun findBySsid(ssid: String): Vehicle? = vehicles.find { it.ssid == ssid }
 
+    fun isDuplicateVehicle(vehicle: Vehicle): Boolean =
+        vehicles.any { it.id == vehicle.id || it.ssid == vehicle.ssid }
+
     fun addVehicle(vehicle: Vehicle): Boolean {
         val current = vehicles
         if (current.size >= Vehicle.MAX_VEHICLES) return false
-        if (current.any { it.ssid == vehicle.ssid }) return false
+        if (isDuplicateVehicle(vehicle)) return false
         vehicles = current + vehicle
         return true
     }
 
     fun removeVehicle(id: String) {
-        vehicles = vehicles.filter { it.id != id }
+        vehicles = vehicles.filter { it.id != id && it.ssid != id }
     }
 
     fun updateVehicle(id: String, transform: (Vehicle) -> Vehicle) {
-        vehicles = vehicles.map { if (it.id == id) transform(it) else it }
+        vehicles = vehicles.map { if (it.id == id || it.ssid == id) transform(it) else it }
     }
 
     /** Migrate legacy single-vehicle prefs to vehicle list (idempotent). */
