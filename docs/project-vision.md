@@ -42,6 +42,12 @@ Use this schema for every dependency:
 - `Companion impact`:
 - `Status`: `Open` | `Requested` | `In Progress` | `Delivered` | `Not Needed`
 
+Example entry format:
+- `Need`: <what head-unit capability is required>
+- `Why`: <why companion-only solution is insufficient>
+- `Companion impact`: <what is blocked or partially deliverable>
+- `Status`: `Open` | `Requested` | `In Progress` | `Delivered` | `Not Needed`
+
 Current blockers:
 - None.
 
