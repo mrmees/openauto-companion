@@ -2,6 +2,10 @@
 
 ## Now
 
+- SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
+  - Rationale: this is the highest-priority product goal for the next 60 days.
+  - Dependency check: if head-unit changes are required, log them under `Blocked by Head Unit` in `docs/project-vision.md` before proceeding past the boundary.
+  - Outcome: validated browsing via bridge and stable drive-session behavior.
 - Verify recent connection reliability fixes on-device.
   - Rationale: latest behavior change included Wi-Fi socket fallback (`EPERM`) and should be validated in real network conditions.
   - Outcome: confidence that fallback path and reconnect logic behave as expected across devices.
