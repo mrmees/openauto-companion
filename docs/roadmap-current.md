@@ -1,5 +1,7 @@
 # Current Roadmap
 
+Governance: capture new ideas in `docs/wishlist.md`; only promoted items should appear in this roadmap.
+
 ## Now
 
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
