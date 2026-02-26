@@ -4,6 +4,12 @@
 
 **Goal:** Add a Status screen button that opens the head unit settings webpage on the phone browser, using per-vehicle QR-provided host/port with fallback to `http://10.0.0.1:8080`.
 
+## Acceptance Criteria
+
+- No active Android Auto media stream is interrupted while launching settings page flow.
+- Settings page launch is resilient: invalid URLs, missing browser handler, and stale endpoint values fail safely with user-facing guidance.
+- Existing connection/session state is preserved regardless of settings-launch outcome.
+
 **Architecture:** Persist optional settings endpoint fields on each `Vehicle`, parse endpoint data from QR pairing links, and surface a primary action button in `StatusScreen` that launches a browser intent only when the selected vehicle is connected. Extract URI parsing and URL building into small pure Kotlin helpers so behavior is unit-testable.
 
 **Tech Stack:** Kotlin, Jetpack Compose Material3, Android Intent ACTION_VIEW, JVM unit tests with JUnit4, Gradle.

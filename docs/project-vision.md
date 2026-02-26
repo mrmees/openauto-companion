@@ -19,6 +19,7 @@ OpenAuto Companion is an Android app that securely connects a phone to an OpenAu
 - Per-vehicle configuration: settings are stored and applied by vehicle identity.
 - Low-friction UX: pairing and operational controls should require minimal steps.
 - Evidence before completion: behavior-changing work must include verification output.
+- No-stream interruption: companion networking behavior must not interrupt active Android Auto media streams.
 
 ## Constraints
 
@@ -54,7 +55,17 @@ Example entry format:
 - `Status`: `Open` | `Requested` | `In Progress` | `Delivered` | `Not Needed`
 
 Current blockers:
-- None.
+- Reverse bridge direction protocol: start/stop/status command set for Pi-to-phone internet sharing.
+  - Need: head-unit reverse routing and route status API.
+  - Why: companion cannot safely control reverse bridge behavior without explicit protocol and lifecycle semantics.
+  - Companion impact: feature cannot progress beyond UX scaffolding and state handling.
+  - Status: Open
+
+- Dynamic identity and endpoint advertisement for settings/connection routing.
+  - Need: discovery/pairing payload must include validated host/port and a stable `vehicle_id` value in addition to SSID, with change notifications.
+  - Why: hardcoded host/MAC assumptions break under DHCP changes, device replacement, and non-default network layouts; relying on SSID alone breaks after SSID reuse.
+  - Companion impact: per-vehicle selection, session routing, and settings-launch routing remain ambiguous without stable vehicle identity.
+  - Status: Delivered
 
 ## Non-Goals
 
@@ -69,3 +80,5 @@ Current blockers:
 - 2026-02-26: Established balanced project management system (`project-vision`, `roadmap-current`, `session-handoffs`).
 - 2026-02-26: Established canonical companion/head-unit boundary policy and `Blocked by Head Unit` tracking model.
 - 2026-02-26: Documented available testing hardware access (Pi over SSH, phone over ADB).
+- 2026-02-26: Requested head-unit pairing/discovery to provide stable `vehicle_id` so companion-side identity resolution can use deterministic IDs instead of SSID-only matching.
+- 2026-02-26: Prodigy head-unit pairing/discovery is now active with stable `vehicle_id` emission; companion-side parser and pairing path consume it as available.

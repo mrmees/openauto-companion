@@ -4,6 +4,12 @@
 
 **Goal:** Achieve verified end-to-end SOCKS5 internet bridging from phone to head unit with stable reconnect behavior for drive sessions.
 
+## Acceptance Criteria
+
+- No active Android Auto media stream is interrupted during bridge startup, reconnect, or stop operations.
+- End-to-end browse traffic continues through bridge for primary success case.
+- Failure and retry behavior leaves existing AA sessions intact and visible.
+
 **Architecture:** Tighten the bridge path in three layers: (1) connection/auth observability in `PiConnection` + `CompanionService`, (2) SOCKS5 runtime correctness and toggling behavior, and (3) explicit manual validation for browsing and drive stability. Use small TDD loops around parser/connection/proxy helpers and keep behavior gates green after each task.
 
 **Tech Stack:** Kotlin, Android Service lifecycle, JVM unit tests (JUnit4), Gradle (`:app:testDebugUnitTest`, `:app:assembleDebug`), Markdown docs.
