@@ -23,6 +23,9 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 - What changed:
 - Why:
 - Status: done | in progress | blocked
+- Dependency decision:
+  - Companion-only: Yes/No
+  - If No, reference `Blocked by Head Unit` entry
 - Next steps:
   - 1)
   - 2)
