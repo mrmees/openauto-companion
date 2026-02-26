@@ -81,7 +81,22 @@ class MainActivity : ComponentActivity() {
                             },
                             onCancel = if (vehicles.isNotEmpty()) {
                                 { screen = Screen.VehicleList }
-                            } else null
+                            } else null,
+                            onScanQr = { screen = Screen.QrScan }
+                        )
+                    }
+                    is Screen.QrScan -> {
+                        BackHandler { screen = Screen.Pairing }
+                        QrScanScreen(
+                            onScanned = { ssid, pin ->
+                                val secret = deriveSecret(pin)
+                                val vehicle = Vehicle(ssid = ssid, name = ssid, sharedSecret = secret)
+                                prefs.addVehicle(vehicle)
+                                vehicles = prefs.vehicles
+                                restartMonitoring()
+                                screen = Screen.VehicleList
+                            },
+                            onCancel = { screen = Screen.Pairing }
                         )
                     }
                     is Screen.Status -> {
@@ -174,5 +189,6 @@ class MainActivity : ComponentActivity() {
 private sealed class Screen {
     data object VehicleList : Screen()
     data object Pairing : Screen()
+    data object QrScan : Screen()
     data class Status(val vehicle: Vehicle) : Screen()
 }

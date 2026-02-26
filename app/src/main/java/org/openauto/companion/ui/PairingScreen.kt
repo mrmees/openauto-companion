@@ -13,7 +13,8 @@ import androidx.compose.ui.unit.dp
 fun PairingScreen(
     suggestedSsid: String = "",
     onPaired: (ssid: String, name: String, pin: String) -> Unit,
-    onCancel: (() -> Unit)? = null
+    onCancel: (() -> Unit)? = null,
+    onScanQr: (() -> Unit)? = null
 ) {
     var ssid by remember { mutableStateOf(suggestedSsid) }
     var name by remember { mutableStateOf("") }
@@ -75,6 +76,17 @@ fun PairingScreen(
                 enabled = pin.length == 6 && ssid.trim().isNotEmpty()
             ) {
                 Text("Pair")
+            }
+        }
+
+        if (onScanQr != null) {
+            Spacer(modifier = Modifier.height(24.dp))
+            HorizontalDivider(modifier = Modifier.fillMaxWidth())
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("Or scan the QR code from your head unit:", style = MaterialTheme.typography.bodyMedium)
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(onClick = onScanQr) {
+                Text("Scan QR Code")
             }
         }
     }
