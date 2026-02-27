@@ -7,7 +7,7 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
   - Rationale: this is the highest-priority product goal for the next 60 days.
   - Dependency check: if head-unit changes are required, log them under `Blocked by Head Unit` in `docs/project-vision.md` before proceeding past the boundary.
-  - Outcome: validated browsing via bridge and stable drive-session behavior.
+  - Outcome: daemon-side validation complete; companion real-world enable/disable + AA continuity validation still required.
 - Preserve Android Auto stream continuity during all bridge and networking changes.
   - Rationale: AA playback must remain uninterrupted; networking features are additive.
   - Outcome: all connection/retry/recovery actions are tested for no interruption to active AA stream sessions.

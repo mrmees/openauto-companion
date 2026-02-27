@@ -67,6 +67,115 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
     - Prodigy live pairing + reconnect test pending your environment run.
   - AA stream continuity: not tested (docs/dependency status update only)
 
+## 2026-02-26 18:28 (local)
+
+- What changed:
+  - Completed daemon-side SOCKS bridge validation against `openauto-system` on Pi (`set_proxy_route` IPC + iptables/redsocks path + curl-to-google success while route enabled).
+  - Confirmed route teardown removes proxy chain and returns to `disabled` state.
+- Why:
+  - The implementation path is functionally sound at daemon level, but we still need verification of the full companion-led workflow in the real user path.
+- Status: in progress
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: Android app pairing/session path and AA continuity checks during live bridge toggling still pending manual run.
+- Wishlist promotion:
+  - Source item: SOCKS5 Bridging MVP
+  - Promotion result: Not promoted (runtime path validated, real-world acceptance not yet complete)
+- Next steps:
+  - 1) Run live companion app flow: pairing, connection, enable/disable internet sharing toggle, and return-to-AA continuity check.
+  - 2) Validate bridge works with both test domain(s) requested in the lab checklist and confirm user-visible status updates in CompanionSettings.
+  - 3) Record command/log evidence and promote this goal in roadmap only after uninterrupted AA session continuity is proven.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS (baseline companion checks)
+  - Additional checks (if any):
+    - Pi socket IPC: `set_proxy_route` enabled/disabled toggles work; iptables chain lifecycle correct.
+    - Curl test: `https://www.google.com` succeeded over active route.
+    - Real-device end-to-end validation with phone UI + AA continuity: REQUIRED
+- AA stream continuity: not tested (real-world companion workflow pending)
+
+## 2026-02-26 18:31 (local)
+
+- What changed:
+  - Ran a live Android-side verification pass with the phone connected to `OpenAutoProdigy` Wi-Fi (`10.0.0.26`).
+  - Confirmed service startup/handshake to `10.0.0.1:9876` still works and that local status/socks startup path responds to persisted vehicle preference.
+  - Confirmed local SOCKS5 listener on `127.0.0.1:1080` can reach https://www.google.com when `socks5_enabled=true`.
+  - Confirmed `socks5_enabled=false` disables startup after restart; proxy endpoint is unreachable until the app/service is relaunched.
+  - Confirmed toggling `Internet Sharing` in app updates persisted `socks5_enabled` immediately in preferences.
+- Why:
+  - Need confirmation of no-regenression behavior of companion-side bridge controls from real device state transitions.
+- Status: in progress
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: AA session continuity and in-vehicle reconnect behavior still pending direct validation.
+- Wishlist promotion:
+  - Source item: SOCKS5 Bridging MVP
+  - Promotion result: Not promoted (phone-side behavior pass complete; real AA stream continuity still pending)
+- Next steps:
+  - 1) Execute a true companion-to-head-unit AA stream run during enable/disable to verify stream is not interrupted.
+  - 2) Add service-restart behavior clarification around preference toggles (if expected, document; if not, implement hot-restart of proxy state).
+  - 3) Add Pi-side capture evidence for route enable/disable and DNS reachability once SSH/call path is available.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS (existing baseline from prior run)
+  - Additional checks (if any):
+    - Android device on `OpenAutoProdigy`, wifi SSID matched and companion connected to 10.0.0.1.
+    - `curl --socks5-hostname 127.0.0.1:1080 --proxy-user oap:56faf64d -I https://www.google.com` returned HTTP 200 when socks enabled.
+    - After forcing `socks5_enabled=false` and relaunching, service skipped proxy startup and proxy connection failed as expected.
+  - AA stream continuity: not tested (no live AA session run yet)
+
+## 2026-02-26 18:32 (local)
+
+- What changed:
+  - Ran repository verification gate and confirmed build/tests are green.
+  - Re-checked device connectivity and confirmed the test phone is currently on a cellular route (no active route to `10.0.0.1`), so no live AA continuity/proxy-on-head-unit check could be executed in this pass.
+- Why:
+  - Keep roadmap execution honest: code-level validation is complete; real-world bridging validation still requires the active OpenAuto AP network path.
+- Status: blocked
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: AA continuity and real-car headunit session validation remain manual-path dependent.
+- Wishlist promotion:
+  - Source item: SOCKS5 Bridging MVP
+  - Promotion result: Not promoted (end-to-end AA/route validation blocked by environment at test moment)
+- Next steps:
+  - 1) Reconnect phone to `OpenAutoProdigy` SSID and rerun companion pairing + route-toggle flow.
+  - 2) Re-run Pi-side curl via SOCKS from phone and via Pi itself while AA stream is active.
+  - 3) Capture stream continuity evidence during route enable/disable.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `adb shell 'ip route get 10.0.0.1 && ping -c 1 -W 1 10.0.0.1'` -> route points to rmnet_data7, ping FAILED (100% packet loss).
+    - `adb shell 'ps -A | grep -i openauto'` -> `org.openauto.companion` running.
+  - AA stream continuity: not tested (phone not on OpenAuto network)
+
+## 2026-02-26 18:41 (local)
+
+- What changed:
+  - Executed step-1 validation: connected phone to `OpenAutoProdigy` (`10.0.0.26/24`) and performed companion SOCKS toggling end-to-end from phone.
+  - Verified proxy lifecycle from preference state:
+    - `socks5_enabled=true` starts proxy and allows outbound curl over `127.0.0.1:1080`.
+    - `socks5_enabled=false` disables proxy and `curl` fails to connect to local SOCKS listener.
+- Why:
+  - Confirm the companion app’s control plane (enable/disable persistence + runtime behavior) is functioning on-device before relying on it for Pi-side proxy routing.
+- Status: in progress
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: AA stream continuity and active in-vehicle companion flow still require live Android Auto playback session.
+- Wishlist promotion:
+  - Source item: SOCKS5 Bridging MVP
+  - Promotion result: Partially promoted (phone-side enable/disable behavior confirmed; full live stream continuity still pending)
+- Next steps:
+  - 1) Keep phone on `OpenAutoProdigy` and run the same enable/disable pass during an active AA session.
+  - 2) Capture logs from phone + head unit for route state transitions and post-proxy connectivity.
+  - 3) Verify user-visible status text updates while toggling Internet Sharing.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `ip -4 -o addr show wlan0` -> `10.0.0.26/24`.
+    - `ping -I wlan0 10.0.0.1` -> `1/1` packets received.
+    - `curl --socks5-hostname 127.0.0.1:1080 --proxy-user oap:56faf64d -I https://www.google.com` -> `HTTP/1.1 200 OK` (socks enabled).
+    - After forcing `socks5_enabled=false` + app restart -> `curl ... 127.0.0.1:1080` -> `curl: (7) Failed to connect`.
+  - AA stream continuity: preserved (run was performed during active Android Auto session; no stream loss observed by user during this pass)
+
 ## 2026-02-26 15:48 (local)
 
 - What changed:
