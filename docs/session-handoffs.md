@@ -41,6 +41,29 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-02-27 10:14 (local)
+
+- What changed:
+  - Updated roadmap outcomes to mark SOCKS5 bridge control-plane work as complete for companion/device-side flow, with explicit outstanding work for deterministic desktop-app routing through the Pi proxy path.
+- Why:
+  - Validation evidence now suggests step-1 objectives are met, but routing guarantees for Pi desktop/system processes are still an open requirement and must be separately owned on the Prodigy side.
+- Status: in progress
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: Reverse bridge direction protocol and other remaining networking exceptions remain required for complete cross-app routing behavior.
+- Wishlist promotion:
+  - Source item: SOCKS5 Bridging MVP
+  - Promotion result: Partially promoted (phone-side bridge controls validated; desktop traffic routing remains)
+- Next steps:
+  - 1) Define a representative desktop/system app traffic matrix to validate under active AA while SOCKS bridge is enabled.
+  - 2) Confirm required Pi-side iptables/redsocks exception tuning and update Prodigy tasking accordingly.
+  - 3) Close the desktop-routing gap and then promote SOCKS5 Bridging from partial to complete in roadmap.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - Companion-side real-device toggling remains verified.
+  - AA stream continuity: preserved in prior in-vehicle companion validation; re-validate during desktop-routing matrix when test execution resumes.
+
 ## 2026-02-26 17:10 (local)
 
 - What changed:
