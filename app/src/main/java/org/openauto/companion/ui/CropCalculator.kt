@@ -4,10 +4,17 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+/**
+ * Pure math for the wallpaper crop screen.
+ * No Android/Compose dependencies — fully unit-testable.
+ */
 object CropCalculator {
 
     data class CropRect(val x: Int, val y: Int, val width: Int, val height: Int)
 
+    /**
+     * Calculate the minimum scale that makes the image fill the view (no empty space).
+     */
     fun initialScale(
         imageWidth: Int, imageHeight: Int,
         viewWidth: Float, viewHeight: Float
@@ -17,9 +24,15 @@ object CropCalculator {
         return max(scaleX, scaleY)
     }
 
+    /**
+     * Clamp scale between min and max.
+     */
     fun clampScale(scale: Float, minScale: Float, maxScale: Float): Float =
         scale.coerceIn(minScale, maxScale)
 
+    /**
+     * Clamp pan offset so the scaled image always covers the view.
+     */
     fun clampOffset(
         offsetX: Float, offsetY: Float,
         scale: Float,
@@ -34,6 +47,10 @@ object CropCalculator {
                 offsetY.coerceIn(-maxOffsetY, maxOffsetY)
     }
 
+    /**
+     * Compute which rectangle of the source image is visible in the view,
+     * given the current scale and pan offset.
+     */
     fun computeCropRect(
         offsetX: Float, offsetY: Float,
         scale: Float,
