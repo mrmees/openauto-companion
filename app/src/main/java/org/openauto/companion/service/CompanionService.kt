@@ -135,7 +135,7 @@ class CompanionService : Service() {
                 _connected.value = true
                 _displayWidth.value = conn.displayWidth
                 _displayHeight.value = conn.displayHeight
-                Log.i(TAG, "Connection established, _connected = true")
+                Log.i(TAG, "Connection established, _connected = true, display=${conn.displayWidth ?: "unknown"}x${conn.displayHeight ?: "unknown"}")
                 _currentVehicleName = vehicleName
                 startSocks5(secret, socks5Enabled)
                 startSilentAudio(audioKeepAlive)
@@ -339,12 +339,15 @@ class CompanionService : Service() {
 
     fun sendTheme(themeJson: JSONObject, wallpaperBytes: ByteArray) {
         val conn = connection ?: run {
+            Log.w(TAG, "sendTheme: no active connection")
             _themeTransferResult.value = ThemeTransfer.TransferResult.Failed("Not connected")
             return
         }
+        Log.i(TAG, "sendTheme: dispatching transfer (wallpaper=${wallpaperBytes.size} bytes)")
         _themeTransferResult.value = null
         themeExecutor.execute {
             val result = ThemeTransfer.send(conn, themeJson, wallpaperBytes) { conn.readLine() }
+            Log.i(TAG, "sendTheme: transfer complete, result=$result")
             _themeTransferResult.value = result
         }
     }

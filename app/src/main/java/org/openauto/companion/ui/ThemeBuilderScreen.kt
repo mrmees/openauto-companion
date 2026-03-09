@@ -3,6 +3,7 @@ package org.openauto.companion.ui
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -36,6 +37,8 @@ import java.io.ByteArrayOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
+private const val TAG = "ThemeBuilder"
+
 @Composable
 fun ThemeBuilderScreen(
     displayWidth: Int,
@@ -61,16 +64,20 @@ fun ThemeBuilderScreen(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
+            Log.d(TAG, "Image picked: $uri")
             context.contentResolver.openInputStream(uri)?.use { stream ->
                 val source = BitmapFactory.decodeStream(stream)
                 if (source != null) {
+                    Log.d(TAG, "Source bitmap: ${source.width}x${source.height}")
                     val cropped = centerCropBitmap(source, displayWidth, displayHeight)
                     source.recycle()
+                    Log.d(TAG, "Cropped to ${cropped.width}x${cropped.height} for target ${displayWidth}x${displayHeight}")
                     croppedBitmap = cropped
 
                     val baos = ByteArrayOutputStream()
                     cropped.compress(Bitmap.CompressFormat.JPEG, 85, baos)
                     wallpaperBytes = baos.toByteArray()
+                    Log.d(TAG, "JPEG wallpaper: ${wallpaperBytes!!.size} bytes (quality 85)")
 
                     val palette = Palette.from(cropped).maximumColorCount(16).generate()
                     val colors = listOfNotNull(
@@ -82,8 +89,11 @@ fun ThemeBuilderScreen(
                     ).distinct().take(5)
                     extractedColors = colors
                     selectedSeed = colors.firstOrNull()
+                    Log.d(TAG, "Extracted ${colors.size} colors from palette, seed: ${colors.firstOrNull()?.let { "#%06X".format(it and 0xFFFFFF) } ?: "none"}")
+                } else {
+                    Log.w(TAG, "BitmapFactory.decodeStream returned null for $uri")
                 }
-            }
+            } ?: Log.w(TAG, "Could not open input stream for $uri")
         }
     }
 
@@ -91,13 +101,16 @@ fun ThemeBuilderScreen(
     LaunchedEffect(selectedSeed, themeName) {
         val seed = selectedSeed
         if (seed != null) {
+            Log.d(TAG, "Generating M3 scheme: seed=#%06X, name='$themeName'".format(seed and 0xFFFFFF))
             generatedTheme = ThemeGenerator.generateScheme(seed, themeName)
+            Log.d(TAG, "Theme generated: ${generatedTheme?.getJSONObject("light")?.length()} light roles, ${generatedTheme?.getJSONObject("dark")?.length()} dark roles")
         }
     }
 
     // Reset sending state when result comes in
     LaunchedEffect(transferResult) {
         if (transferResult != null) {
+            Log.i(TAG, "Transfer result: $transferResult")
             isSending = false
         }
     }
@@ -207,6 +220,7 @@ fun ThemeBuilderScreen(
                     val theme = generatedTheme
                     val bytes = wallpaperBytes
                     if (theme != null && bytes != null) {
+                        Log.i(TAG, "Sending theme '${theme.optString("name")}' with ${bytes.size} byte wallpaper")
                         isSending = true
                         onSendTheme(theme, bytes)
                     }
