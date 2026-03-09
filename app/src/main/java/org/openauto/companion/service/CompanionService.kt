@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class CompanionService : Service() {
     private var connection: PiConnection? = null
     private val executor = Executors.newSingleThreadScheduledExecutor()
+    private val themeExecutor = Executors.newSingleThreadExecutor()
     private var pushTask: ScheduledFuture<*>? = null
     private var retryTask: ScheduledFuture<*>? = null
     private val seq = AtomicInteger(0)
@@ -342,7 +343,7 @@ class CompanionService : Service() {
             return
         }
         _themeTransferResult.value = null
-        executor.execute {
+        themeExecutor.execute {
             val result = ThemeTransfer.send(conn, themeJson, wallpaperBytes) { conn.readLine() }
             _themeTransferResult.value = result
         }
@@ -360,6 +361,7 @@ class CompanionService : Service() {
         _vehicleId.value = ""
         _currentVehicleKey = ""
         locationManager?.removeUpdates(locationListener)
+        themeExecutor.shutdown()
         executor.shutdown()
         super.onDestroy()
     }

@@ -61,27 +61,28 @@ fun ThemeBuilderScreen(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            val inputStream = context.contentResolver.openInputStream(uri)
-            val source = BitmapFactory.decodeStream(inputStream)
-            inputStream?.close()
-            if (source != null) {
-                val cropped = centerCropBitmap(source, displayWidth, displayHeight)
-                croppedBitmap = cropped
+            context.contentResolver.openInputStream(uri)?.use { stream ->
+                val source = BitmapFactory.decodeStream(stream)
+                if (source != null) {
+                    val cropped = centerCropBitmap(source, displayWidth, displayHeight)
+                    source.recycle()
+                    croppedBitmap = cropped
 
-                val baos = ByteArrayOutputStream()
-                cropped.compress(Bitmap.CompressFormat.JPEG, 85, baos)
-                wallpaperBytes = baos.toByteArray()
+                    val baos = ByteArrayOutputStream()
+                    cropped.compress(Bitmap.CompressFormat.JPEG, 85, baos)
+                    wallpaperBytes = baos.toByteArray()
 
-                val palette = Palette.from(cropped).maximumColorCount(16).generate()
-                val colors = listOfNotNull(
-                    palette.getDominantColor(0).takeIf { it != 0 },
-                    palette.getVibrantColor(0).takeIf { it != 0 },
-                    palette.getMutedColor(0).takeIf { it != 0 },
-                    palette.getDarkVibrantColor(0).takeIf { it != 0 },
-                    palette.getLightVibrantColor(0).takeIf { it != 0 }
-                ).distinct().take(5)
-                extractedColors = colors
-                selectedSeed = colors.firstOrNull()
+                    val palette = Palette.from(cropped).maximumColorCount(16).generate()
+                    val colors = listOfNotNull(
+                        palette.getDominantColor(0).takeIf { it != 0 },
+                        palette.getVibrantColor(0).takeIf { it != 0 },
+                        palette.getMutedColor(0).takeIf { it != 0 },
+                        palette.getDarkVibrantColor(0).takeIf { it != 0 },
+                        palette.getLightVibrantColor(0).takeIf { it != 0 }
+                    ).distinct().take(5)
+                    extractedColors = colors
+                    selectedSeed = colors.firstOrNull()
+                }
             }
         }
     }
@@ -304,5 +305,7 @@ private fun centerCropBitmap(source: Bitmap, targetWidth: Int, targetHeight: Int
     val x = (source.width - cropWidth) / 2
     val y = (source.height - cropHeight) / 2
     val cropped = Bitmap.createBitmap(source, x, y, cropWidth, cropHeight)
-    return Bitmap.createScaledBitmap(cropped, targetWidth, targetHeight, true)
+    val scaled = Bitmap.createScaledBitmap(cropped, targetWidth, targetHeight, true)
+    if (cropped != source) cropped.recycle()
+    return scaled
 }

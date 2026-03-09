@@ -234,6 +234,9 @@ class MainActivity : ComponentActivity() {
                     }
                     is Screen.ThemeBuilder -> {
                         BackHandler { screen = Screen.Status(s.vehicle) }
+                        LaunchedEffect(Unit) {
+                            CompanionService.clearThemeTransferResult()
+                        }
                         val displayW by CompanionService.displayWidth.collectAsStateWithLifecycle()
                         val displayH by CompanionService.displayHeight.collectAsStateWithLifecycle()
                         val transferResult by CompanionService.themeTransferResult.collectAsStateWithLifecycle()
