@@ -24,6 +24,10 @@ class PiConnection(
         private set
     var isAuthenticated = false
         private set
+    var displayWidth: Int? = null
+        private set
+    var displayHeight: Int? = null
+        private set
 
     fun connect(): Boolean {
         disconnect()
@@ -72,6 +76,14 @@ class PiConnection(
                 ?: return fail("Invalid session_key format in ack")
             isAuthenticated = true
             lastFailureReason = null
+
+            val displayInfo = parseDisplayFromAck(ack)
+            if (displayInfo != null) {
+                displayWidth = displayInfo.first
+                displayHeight = displayInfo.second
+                Log.i(TAG, "Head unit display: ${displayWidth}x${displayHeight}")
+            }
+
             Log.i(TAG, "Connected and authenticated successfully (host=$host, port=$port)")
             true
         } catch (e: Exception) {
@@ -84,9 +96,13 @@ class PiConnection(
         writer?.println(status.toString())
     }
 
+    fun readLine(): String? = reader?.readLine()
+
     fun disconnect() {
         isAuthenticated = false
         sessionKey = null
+        displayWidth = null
+        displayHeight = null
         try { writer?.close() } catch (_: Exception) {}
         try { reader?.close() } catch (_: Exception) {}
         try { socket?.close() } catch (_: Exception) {}
@@ -134,6 +150,14 @@ class PiConnection(
     companion object {
         private const val TAG = "PiConnection"
     }
+}
+
+internal fun parseDisplayFromAck(ack: JSONObject): Pair<Int, Int>? {
+    val display = ack.optJSONObject("display") ?: return null
+    val width = display.optInt("width", 0)
+    val height = display.optInt("height", 0)
+    if (width <= 0 || height <= 0) return null
+    return width to height
 }
 
 internal fun decodeHexKey(hex: String): ByteArray? {
