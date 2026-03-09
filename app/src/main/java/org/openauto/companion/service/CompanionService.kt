@@ -346,9 +346,16 @@ class CompanionService : Service() {
         Log.i(TAG, "sendTheme: dispatching transfer (wallpaper=${wallpaperBytes.size} bytes)")
         _themeTransferResult.value = null
         themeExecutor.execute {
-            val result = ThemeTransfer.send(conn, themeJson, wallpaperBytes) { conn.readLine() }
-            Log.i(TAG, "sendTheme: transfer complete, result=$result")
-            _themeTransferResult.value = result
+            try {
+                val result = ThemeTransfer.send(conn, themeJson, wallpaperBytes) { conn.readLine() }
+                Log.i(TAG, "sendTheme: transfer complete, result=$result")
+                _themeTransferResult.value = result
+            } catch (e: Exception) {
+                Log.e(TAG, "sendTheme: transfer failed with exception", e)
+                _themeTransferResult.value = ThemeTransfer.TransferResult.Failed(
+                    e.message ?: "Transfer failed"
+                )
+            }
         }
     }
 

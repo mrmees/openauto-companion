@@ -3,6 +3,7 @@ package org.openauto.companion.ui
 import android.graphics.Bitmap
 import android.util.Log
 import androidx.compose.animation.core.animate
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.rememberTransformableState
@@ -12,8 +13,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -34,8 +41,9 @@ fun WallpaperCropScreen(
     var viewSize by remember { mutableStateOf(IntSize.Zero) }
     val coroutineScope = rememberCoroutineScope()
 
-    // Compute min scale once we know the view size
-    val minScale = remember(viewSize, sourceBitmap) {
+    // fillScale = minimum to cover the view (no empty space)
+    // fitScale = minimum to see the entire image (may have letterboxing)
+    val fillScale = remember(viewSize, sourceBitmap) {
         if (viewSize.width > 0 && viewSize.height > 0) {
             CropCalculator.initialScale(
                 sourceBitmap.width, sourceBitmap.height,
@@ -43,16 +51,25 @@ fun WallpaperCropScreen(
             )
         } else 1f
     }
+    val fitScale = remember(viewSize, sourceBitmap) {
+        if (viewSize.width > 0 && viewSize.height > 0) {
+            kotlin.math.min(
+                viewSize.width.toFloat() / sourceBitmap.width,
+                viewSize.height.toFloat() / sourceBitmap.height
+            )
+        } else 1f
+    }
+    val minScale = fitScale
     val maxScale = 5f
 
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
-    // Reset scale to minScale when view size is first known
-    LaunchedEffect(minScale) {
-        if (minScale > 0f) {
-            scale = minScale
+    // Initialize to fill scale when view size is first known
+    LaunchedEffect(fillScale) {
+        if (fillScale > 0f) {
+            scale = fillScale
             offsetX = 0f
             offsetY = 0f
         }
@@ -115,13 +132,51 @@ fun WallpaperCropScreen(
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
-                                scaleX = scale / minScale
-                                scaleY = scale / minScale
+                                scaleX = scale / fitScale
+                                scaleY = scale / fitScale
                                 translationX = offsetX
                                 translationY = offsetY
                             },
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Fit
                     )
+
+                    // Crop frame overlay — dark scrim with clear cutout
+                    val density = LocalDensity.current
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                            val canvasW = size.width
+                            val canvasH = size.height
+
+                            // Crop rect: the target aspect ratio centered in view
+                            val cropW: Float
+                            val cropH: Float
+                            if (canvasW / canvasH > targetAspectRatio) {
+                                cropH = canvasH
+                                cropW = canvasH * targetAspectRatio
+                            } else {
+                                cropW = canvasW
+                                cropH = canvasW / targetAspectRatio
+                            }
+                            val cropLeft = (canvasW - cropW) / 2f
+                            val cropTop = (canvasH - cropH) / 2f
+
+                            // Draw scrim everywhere except the crop rect
+                            val cropPath = Path().apply {
+                                addRect(Rect(Offset(cropLeft, cropTop), Size(cropW, cropH)))
+                            }
+                            clipPath(cropPath, clipOp = ClipOp.Difference) {
+                                drawRect(Color.Black.copy(alpha = 0.5f))
+                            }
+
+                            // Draw crop frame border
+                            drawRect(
+                                color = Color.White.copy(alpha = 0.7f),
+                                topLeft = Offset(cropLeft, cropTop),
+                                size = Size(cropW, cropH),
+                                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                    width = with(density) { 1.5.dp.toPx() }
+                                )
+                            )
+                        }
                 }
             }
         }
@@ -132,6 +187,7 @@ fun WallpaperCropScreen(
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
                 .background(Color.Black.copy(alpha = 0.7f))
+                .navigationBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -144,7 +200,7 @@ fun WallpaperCropScreen(
                 onClick = {
                     coroutineScope.launch {
                         launch {
-                            animate(scale, minScale) { value, _ -> scale = value }
+                            animate(scale, fillScale) { value, _ -> scale = value }
                         }
                         launch {
                             animate(offsetX, 0f) { value, _ -> offsetX = value }
