@@ -12,7 +12,9 @@ data class Vehicle(
     val socks5Enabled: Boolean = true,
     val audioKeepAlive: Boolean = false,
     val settingsHost: String? = null,
-    val settingsPort: Int? = null
+    val settingsPort: Int? = null,
+    val displayWidth: Int? = null,
+    val displayHeight: Int? = null
     ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
@@ -23,6 +25,8 @@ data class Vehicle(
         put("audio_keep_alive", audioKeepAlive)
         if (!settingsHost.isNullOrBlank()) put("settings_host", settingsHost)
         if (settingsPort != null) put("settings_port", settingsPort)
+        if (displayWidth != null) put("display_width", displayWidth)
+        if (displayHeight != null) put("display_height", displayHeight)
     }
 
     companion object {
@@ -37,7 +41,9 @@ data class Vehicle(
             socks5Enabled = json.optBoolean("socks5_enabled", true),
             audioKeepAlive = json.optBoolean("audio_keep_alive", false),
             settingsHost = json.optString("settings_host", "").ifBlank { null },
-            settingsPort = if (json.has("settings_port")) json.optInt("settings_port") else null
+            settingsPort = if (json.has("settings_port")) json.optInt("settings_port") else null,
+            displayWidth = if (json.has("display_width")) json.optInt("display_width") else null,
+            displayHeight = if (json.has("display_height")) json.optInt("display_height") else null
         )
 
         fun listToJson(vehicles: List<Vehicle>): String =
