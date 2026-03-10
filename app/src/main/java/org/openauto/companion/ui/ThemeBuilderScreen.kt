@@ -87,6 +87,9 @@ fun ThemeBuilderScreen(
     var isSending by remember { mutableStateOf(false) }
     var sourceBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showCropScreen by remember { mutableStateOf(false) }
+    var customSeedColor by remember { mutableStateOf<Int?>(null) }
+    var showColorPicker by remember { mutableStateOf(false) }
+    var showSendDialog by remember { mutableStateOf(false) }
 
     val imagePicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -177,12 +180,12 @@ fun ThemeBuilderScreen(
                 "Target: ${displayWidth}x${displayHeight}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 48.dp)
+                modifier = Modifier.padding(top = 4.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // 3. Wallpaper picker
+            // 4. Wallpaper picker
             Button(
                 onClick = { imagePicker.launch("image/*") },
                 modifier = Modifier.fillMaxWidth()
@@ -216,17 +219,17 @@ fun ThemeBuilderScreen(
                 }
             }
 
-            // 4. Seed color bar
-            if (extractedColors.isNotEmpty()) {
+            // 4. Seed color
+            if (extractedColors.isNotEmpty() || croppedBitmap != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text("Seed Color", style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     extractedColors.forEach { colorArgb ->
-                        val isSelected = colorArgb == selectedSeed
+                        val isSelected = colorArgb == selectedSeed && customSeedColor == null
                         Box(
                             modifier = Modifier
-                                .size(48.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .background(Color(colorArgb))
                                 .then(
@@ -236,10 +239,51 @@ fun ThemeBuilderScreen(
                                         Modifier.border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
                                     }
                                 )
-                                .clickable { selectedSeed = colorArgb }
+                                .clickable {
+                                    customSeedColor = null
+                                    selectedSeed = colorArgb
+                                }
                         )
                     }
+                    // Custom color circle — shows custom color or "+" icon
+                    val isCustomSelected = customSeedColor != null
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (customSeedColor != null) Color(customSeedColor!!)
+                                else MaterialTheme.colorScheme.surfaceVariant
+                            )
+                            .then(
+                                if (isCustomSelected) {
+                                    Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                } else {
+                                    Modifier.border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                                }
+                            )
+                            .clickable { showColorPicker = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (customSeedColor == null) {
+                            Text("+", style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
+            }
+
+            // Color picker dialog
+            if (showColorPicker) {
+                ColorPickerDialog(
+                    initialColor = customSeedColor ?: selectedSeed ?: 0xFF6750A4.toInt(),
+                    onColorSelected = { color ->
+                        customSeedColor = color
+                        selectedSeed = color
+                        showColorPicker = false
+                    },
+                    onDismiss = { showColorPicker = false }
+                )
             }
 
             // 5. Palette preview
@@ -255,31 +299,11 @@ fun ThemeBuilderScreen(
                 PalettePreview(theme.getJSONObject("dark"))
             }
 
-            // 6. Theme name
-            if (croppedBitmap != null) {
-                Spacer(modifier = Modifier.height(16.dp))
-                OutlinedTextField(
-                    value = themeName,
-                    onValueChange = { themeName = it },
-                    label = { Text("Theme Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            // 7. Send button
+            // 6. Send button
             if (croppedBitmap != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
-                    onClick = {
-                        val theme = generatedTheme
-                        val bytes = wallpaperBytes
-                        if (theme != null && bytes != null) {
-                            Log.i(TAG, "Sending theme '${theme.optString("name")}' with ${bytes.size} byte wallpaper")
-                            isSending = true
-                            onSendTheme(theme, bytes)
-                        }
-                    },
+                    onClick = { showSendDialog = true },
                     enabled = generatedTheme != null && wallpaperBytes != null && !isSending,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -295,6 +319,40 @@ fun ThemeBuilderScreen(
                         Text("Send to Head Unit")
                     }
                 }
+            }
+
+            // Send confirmation dialog with theme name
+            if (showSendDialog) {
+                AlertDialog(
+                    onDismissRequest = { showSendDialog = false },
+                    title = { Text("Send Theme") },
+                    text = {
+                        OutlinedTextField(
+                            value = themeName,
+                            onValueChange = { themeName = it },
+                            label = { Text("Theme Name") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showSendDialog = false
+                                val theme = generatedTheme
+                                val bytes = wallpaperBytes
+                                if (theme != null && bytes != null) {
+                                    Log.i(TAG, "Sending theme '${themeName}' with ${bytes.size} byte wallpaper")
+                                    isSending = true
+                                    onSendTheme(theme, bytes)
+                                }
+                            }
+                        ) { Text("Send") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showSendDialog = false }) { Text("Cancel") }
+                    }
+                )
             }
 
             // 8. Result display
@@ -343,12 +401,12 @@ private fun PalettePreview(schemeJson: JSONObject) {
     }
 
     LazyVerticalGrid(
-        columns = GridCells.Fixed(6),
+        columns = GridCells.Fixed(12),
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = 120.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+            .heightIn(max = 48.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
         userScrollEnabled = false
     ) {
         items(items) { (role, color) ->
@@ -370,4 +428,65 @@ private fun parseHexColor(hex: String): Color {
     } catch (_: Exception) {
         Color.Gray
     }
+}
+
+@Composable
+private fun ColorPickerDialog(
+    initialColor: Int,
+    onColorSelected: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val controller = com.github.skydoves.colorpicker.compose.rememberColorPickerController()
+    var pickedColor by remember { mutableStateOf(initialColor) }
+    var hexDisplay by remember { mutableStateOf("%06X".format(initialColor and 0xFFFFFF)) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Pick a Color") },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                com.github.skydoves.colorpicker.compose.HsvColorPicker(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp),
+                    controller = controller,
+                    initialColor = Color(initialColor),
+                    onColorChanged = { envelope ->
+                        if (envelope.fromUser) {
+                            pickedColor = envelope.color.toArgb()
+                            hexDisplay = envelope.hexCode.takeLast(6)
+                        }
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Preview + hex
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(Color(pickedColor))
+                            .border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        "#$hexDisplay",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onColorSelected(pickedColor) }) {
+                Text("Select")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
