@@ -58,6 +58,12 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
 
+    // Theme builder
+    implementation("me.tatarka.google.material:material-color-utilities:0.1.2")
+    implementation("androidx.palette:palette-ktx:1.0.0")
+    implementation("com.github.skydoves:colorpicker-compose:1.1.3")
+    implementation("com.vanniktech:android-image-cropper:4.6.0")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("org.json:json:20231013")

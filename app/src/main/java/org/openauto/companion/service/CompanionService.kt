@@ -19,7 +19,9 @@ import org.openauto.companion.CompanionApp
 import org.openauto.companion.net.PiConnection
 import org.openauto.companion.net.Protocol
 import org.openauto.companion.net.Socks5Server
+import org.openauto.companion.net.ThemeTransfer
 import org.openauto.companion.ui.MainActivity
+import org.json.JSONObject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -32,6 +34,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class CompanionService : Service() {
     private var connection: PiConnection? = null
     private val executor = Executors.newSingleThreadScheduledExecutor()
+    private val themeExecutor = Executors.newSingleThreadExecutor()
     private var pushTask: ScheduledFuture<*>? = null
     private var retryTask: ScheduledFuture<*>? = null
     private val seq = AtomicInteger(0)
@@ -52,6 +55,7 @@ class CompanionService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         locationManager = getSystemService(LocationManager::class.java)
     }
 
@@ -129,7 +133,9 @@ class CompanionService : Service() {
                 connection = conn
                 connecting = false
                 _connected.value = true
-                Log.i(TAG, "Connection established, _connected = true")
+                _displayWidth.value = conn.displayWidth
+                _displayHeight.value = conn.displayHeight
+                Log.i(TAG, "Connection established, _connected = true, display=${conn.displayWidth ?: "unknown"}x${conn.displayHeight ?: "unknown"}")
                 _currentVehicleName = vehicleName
                 startSocks5(secret, socks5Enabled)
                 startSilentAudio(audioKeepAlive)
@@ -235,6 +241,9 @@ class CompanionService : Service() {
         _connected.value = false
         _socks5Active.value = false
         _audioKeepAliveActive.value = false
+        _displayWidth.value = null
+        _displayHeight.value = null
+        _themeTransferResult.value = null
 
         socks5Server?.stop()
         socks5Server = null
@@ -328,14 +337,41 @@ class CompanionService : Service() {
         nm.notify(NOTIFICATION_ID, buildNotification(text))
     }
 
+    fun sendTheme(themeJson: JSONObject, wallpaperBytes: ByteArray) {
+        val conn = connection ?: run {
+            Log.w(TAG, "sendTheme: no active connection")
+            _themeTransferResult.value = ThemeTransfer.TransferResult.Failed("Not connected")
+            return
+        }
+        Log.i(TAG, "sendTheme: dispatching transfer (wallpaper=${wallpaperBytes.size} bytes)")
+        _themeTransferResult.value = null
+        themeExecutor.execute {
+            try {
+                val result = ThemeTransfer.send(conn, themeJson, wallpaperBytes) { conn.readLine() }
+                Log.i(TAG, "sendTheme: transfer complete, result=$result")
+                _themeTransferResult.value = result
+            } catch (e: Exception) {
+                Log.e(TAG, "sendTheme: transfer failed with exception", e)
+                _themeTransferResult.value = ThemeTransfer.TransferResult.Failed(
+                    e.message ?: "Transfer failed"
+                )
+            }
+        }
+    }
+
     override fun onDestroy() {
+        instance = null
         _connected.value = false
+        _displayWidth.value = null
+        _displayHeight.value = null
+        _themeTransferResult.value = null
         clearConnectionState()
         connecting = false
         _vehicleName.value = ""
         _vehicleId.value = ""
         _currentVehicleKey = ""
         locationManager?.removeUpdates(locationListener)
+        themeExecutor.shutdown()
         executor.shutdown()
         super.onDestroy()
     }
@@ -346,6 +382,8 @@ class CompanionService : Service() {
         private const val TAG = "CompanionService"
         private const val NOTIFICATION_ID = 1001
         private const val ACTION_TOGGLE_AUDIO = "org.openauto.companion.TOGGLE_AUDIO"
+
+        private var instance: CompanionService? = null
 
         private val _connected = MutableStateFlow(false)
         val connected: StateFlow<Boolean> = _connected.asStateFlow()
@@ -361,5 +399,23 @@ class CompanionService : Service() {
 
         private val _vehicleId = MutableStateFlow("")
         val vehicleId: StateFlow<String> = _vehicleId.asStateFlow()
+
+        private val _displayWidth = MutableStateFlow<Int?>(null)
+        val displayWidth: StateFlow<Int?> = _displayWidth.asStateFlow()
+
+        private val _displayHeight = MutableStateFlow<Int?>(null)
+        val displayHeight: StateFlow<Int?> = _displayHeight.asStateFlow()
+
+        private val _themeTransferResult = MutableStateFlow<ThemeTransfer.TransferResult?>(null)
+        val themeTransferResult: StateFlow<ThemeTransfer.TransferResult?> = _themeTransferResult.asStateFlow()
+
+        fun sendThemeStatic(themeJson: JSONObject, wallpaperBytes: ByteArray) {
+            instance?.sendTheme(themeJson, wallpaperBytes)
+                ?: run { _themeTransferResult.value = ThemeTransfer.TransferResult.Failed("Service not running") }
+        }
+
+        fun clearThemeTransferResult() {
+            _themeTransferResult.value = null
+        }
     }
 }

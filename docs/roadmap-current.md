@@ -7,7 +7,7 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
   - Rationale: this is the highest-priority product goal for the next 60 days.
   - Dependency check: if head-unit changes are required, log them under `Blocked by Head Unit` in `docs/project-vision.md` before proceeding past the boundary.
-  - Outcome: validated browsing via bridge and stable drive-session behavior.
+  - Outcome: companion-side enable/disable + status behavior and local phone-side SOCKS operation are validated; daemon-side redsocks/iptables path and status propagation are validated. Remaining validation target is deterministic desktop-app routing on Pi through the bridge while preserving AA continuity.
 - Preserve Android Auto stream continuity during all bridge and networking changes.
   - Rationale: AA playback must remain uninterrupted; networking features are additive.
   - Outcome: all connection/retry/recovery actions are tested for no interruption to active AA stream sessions.
@@ -19,6 +19,11 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
   - Outcome: all behavior-changing sessions leave vision alignment + handoff evidence.
 
 ## Next
+
+- Validate deterministic desktop-app routing when phone-to-headunit bridge is enabled.
+  - Rationale: current verification confirms SOCKS listener and representative phone-side traffic, but Pi desktop/system processes must also be guaranteed to honor proxy routing.
+  - Dependency check: likely requires Prodigy-side routing exception tuning (protocol/process scope, DNS handling, and service-specific bypass rules).
+  - Outcome: representative desktop/system traffic on Pi is shown to traverse the SOCKS path and remains stable during active AA use.
 
 - Support reverse-direction bridge for Pi-to-phone internet sharing.
   - Rationale: enables unusual but valid setups where phone data is unavailable and Pi has upstream connectivity.

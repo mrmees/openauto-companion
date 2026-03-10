@@ -67,6 +67,12 @@ Current blockers:
   - Companion impact: per-vehicle selection, session routing, and settings-launch routing remain ambiguous without stable vehicle identity.
   - Status: Delivered
 
+- Deterministic Pi desktop/system routing behavior under phone-to-headunit SOCKS bridge.
+  - Need: head-unit-side networking policy should ensure expected desktop/system app traffic follows redsocks policy without unintended bypasses while preserving AA service continuity.
+  - Why: mobile-side enable/disable and local proxy plumbing are validated, but representative desktop workloads still need proof of policy-compliant routing.
+  - Companion impact: end-to-end bridge completion and release criteria cannot be confirmed from companion validation alone.
+  - Status: Open
+
 ## Non-Goals
 
 - Building a full backend/cloud service for pairing or account management.
@@ -82,3 +88,4 @@ Current blockers:
 - 2026-02-26: Documented available testing hardware access (Pi over SSH, phone over ADB).
 - 2026-02-26: Requested head-unit pairing/discovery to provide stable `vehicle_id` so companion-side identity resolution can use deterministic IDs instead of SSID-only matching.
 - 2026-02-26: Prodigy head-unit pairing/discovery is now active with stable `vehicle_id` emission; companion-side parser and pairing path consume it as available.
+- 2026-02-27: Reframed SOCKS5 bridging milestone as "companion/device control-plane validated; deterministic Pi desktop/system routing is still a pending validation and tuning area."

@@ -29,6 +29,7 @@ fun StatusScreen(
     audioKeepAlive: Boolean,
     onAudioKeepAliveToggle: (Boolean) -> Unit,
     onOpenSettingsPage: () -> Unit,
+    onOpenThemeBuilder: () -> Unit,
     onUnpair: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -71,6 +72,16 @@ fun StatusScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Open Settings Page")
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(
+            onClick = onOpenThemeBuilder,
+            enabled = status.connected,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Theme Builder")
         }
 
         Spacer(modifier = Modifier.height(16.dp))

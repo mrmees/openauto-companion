@@ -26,6 +26,7 @@ import org.openauto.companion.CompanionApp
 import org.openauto.companion.data.CompanionPrefs
 import org.openauto.companion.data.Vehicle
 import org.openauto.companion.net.SettingsUrlBuilder
+import org.openauto.companion.net.ThemeTransfer
 import org.openauto.companion.service.CompanionService
 import org.openauto.companion.service.VehicleIdentity
 import java.security.MessageDigest
@@ -219,6 +220,9 @@ class MainActivity : ComponentActivity() {
                                     ).show()
                                 }
                             },
+                            onOpenThemeBuilder = {
+                                screen = Screen.ThemeBuilder(vehicle)
+                            },
                             onUnpair = {
                                 prefs.removeVehicle(vehicle.id)
                                 vehicles = prefs.vehicles
@@ -226,6 +230,29 @@ class MainActivity : ComponentActivity() {
                                 screen = if (vehicles.isEmpty()) Screen.Pairing else Screen.VehicleList
                             },
                             onBack = { screen = Screen.VehicleList }
+                        )
+                    }
+                    is Screen.ThemeBuilder -> {
+                        BackHandler { screen = Screen.Status(s.vehicle) }
+                        LaunchedEffect(Unit) {
+                            CompanionService.clearThemeTransferResult()
+                        }
+                        val displayW by CompanionService.displayWidth.collectAsStateWithLifecycle()
+                        val displayH by CompanionService.displayHeight.collectAsStateWithLifecycle()
+                        val transferResult by CompanionService.themeTransferResult.collectAsStateWithLifecycle()
+
+                        ThemeBuilderScreen(
+                            displayWidth = displayW ?: 1024,
+                            displayHeight = displayH ?: 600,
+                            onSendTheme = { themeJson, wallpaperBytes ->
+                                CompanionService.sendThemeStatic(themeJson, wallpaperBytes)
+                            },
+                            transferResult = when (val r = transferResult) {
+                                is ThemeTransfer.TransferResult.Success -> "success"
+                                is ThemeTransfer.TransferResult.Failed -> r.reason
+                                null -> null
+                            },
+                            onBack = { screen = Screen.Status(s.vehicle) }
                         )
                     }
                 }
@@ -281,4 +308,5 @@ private sealed class Screen {
     data object Pairing : Screen()
     data object QrScan : Screen()
     data class Status(val vehicle: Vehicle) : Screen()
+    data class ThemeBuilder(val vehicle: Vehicle) : Screen()
 }

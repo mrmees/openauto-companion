@@ -67,6 +67,26 @@ class VehicleSerializationTest {
     }
 
     @Test
+    fun roundTrip_displayResolution() {
+        val v = Vehicle(id = "disp1", ssid = "TestAP", sharedSecret = "s",
+            displayWidth = 1024, displayHeight = 600)
+        val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v)))
+        assertEquals(1024, result[0].displayWidth)
+        assertEquals(600, result[0].displayHeight)
+    }
+
+    @Test
+    fun fromJson_displayResolutionDefaultsWhenMissing() {
+        val json = org.json.JSONObject().apply {
+            put("ssid", "OldHU")
+            put("shared_secret", "abc")
+        }
+        val v = Vehicle.fromJson(json)
+        assertNull(v.displayWidth)
+        assertNull(v.displayHeight)
+    }
+
+    @Test
     fun emptyJson_returnsEmptyList() {
         assertEquals(emptyList<Vehicle>(), Vehicle.listFromJson(""))
     }

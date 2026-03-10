@@ -1,7 +1,10 @@
 package org.openauto.companion.net
 
+import org.json.JSONObject
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -35,5 +38,26 @@ class PiConnectionParsingTest {
     fun shouldFallbackToUnboundSocket_returnsFalseForOtherErrors() {
         val err = SocketException("Connection timed out")
         assertFalse(shouldFallbackToUnboundSocket(err))
+    }
+
+    @Test
+    fun parseDisplayFromAck_validDisplay() {
+        val ack = JSONObject("""{"type":"hello_ack","accepted":true,"session_key":"aa","display":{"width":1024,"height":600}}""")
+        val result = parseDisplayFromAck(ack)
+        assertNotNull(result)
+        assertEquals(1024, result!!.first)
+        assertEquals(600, result.second)
+    }
+
+    @Test
+    fun parseDisplayFromAck_missingDisplay() {
+        val ack = JSONObject("""{"type":"hello_ack","accepted":true,"session_key":"aa"}""")
+        assertNull(parseDisplayFromAck(ack))
+    }
+
+    @Test
+    fun parseDisplayFromAck_zeroValues() {
+        val ack = JSONObject("""{"type":"hello_ack","accepted":true,"session_key":"aa","display":{"width":0,"height":0}}""")
+        assertNull(parseDisplayFromAck(ack))
     }
 }

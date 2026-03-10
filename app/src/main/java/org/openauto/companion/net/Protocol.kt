@@ -66,6 +66,42 @@ object Protocol {
         return payload
     }
 
+    fun buildThemeMessage(
+        sessionKey: ByteArray,
+        themeJson: JSONObject,
+        wallpaperFormat: String,
+        wallpaperSize: Int,
+        wallpaperChunks: Int
+    ): JSONObject {
+        val payload = JSONObject().apply {
+            put("type", "theme")
+            put("theme", themeJson)
+            put("wallpaper", JSONObject().apply {
+                put("format", wallpaperFormat)
+                put("size", wallpaperSize)
+                put("chunks", wallpaperChunks)
+            })
+        }
+        val mac = computeHmac(sessionKey, payload.toString().toByteArray())
+        payload.put("mac", mac)
+        return payload
+    }
+
+    fun buildThemeDataChunk(
+        sessionKey: ByteArray,
+        chunkIndex: Int,
+        base64Data: String
+    ): JSONObject {
+        val payload = JSONObject().apply {
+            put("type", "theme_data")
+            put("chunk", chunkIndex)
+            put("data", base64Data)
+        }
+        val mac = computeHmac(sessionKey, payload.toString().toByteArray())
+        payload.put("mac", mac)
+        return payload
+    }
+
     fun verifyMac(msg: JSONObject, sessionKey: ByteArray): Boolean {
         val mac = msg.optString("mac", "")
         if (mac.isEmpty()) return false
