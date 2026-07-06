@@ -41,6 +41,35 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-06 14:48 (local)
+
+- What changed:
+  - Extended `Vehicle` persistence with optional External API v1 credentials: `api_client_id`, `api_secret_hex`, and `api_mode`.
+  - Added migration-safe defaults so existing vehicle JSON remains legacy mode with null v1 credentials.
+  - Added `ApiPairingCredentialStore` to persist `ApiSessionClient` pairing credentials as client id plus 32-byte secret hex for a matched vehicle.
+  - Added unit tests for vehicle serialization defaults and pairing-result credential persistence.
+  - Updated the API v1 migration plan and roadmap wording to include the credential-storage foundation.
+- Why:
+  - Companion needs per-vehicle v1 auth material beside the legacy `sharedSecret` before any future live pairing or service report cutover can be safely wired.
+- Status: done
+- Dependency decision:
+  - Companion-only: Yes
+  - If No, reference `Blocked by Head Unit` entry: n/a; first Pi live-client validation remains a future integration step before service cutover.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Run first live Pi client validation with the v1 session client before service report cutover.
+  - 2) Add an explicit v1 pairing entry point only after deciding how v1 mode is selected during transition.
+  - 3) Keep theme/wallpaper on legacy `9876` until the future web-config HTTP upload endpoint exists.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.data.VehicleSerializationTest" --tests "org.openauto.companion.net.api.ApiPairingCredentialStoreTest"` -> PASS
+    - `git diff --check` -> PASS
+    - New API helper scan found no v1.1 field references in app code.
+  - AA stream continuity: not tested (no service/runtime cutover in this slice)
+
 ## 2026-07-06 14:20 (local)
 
 - What changed:

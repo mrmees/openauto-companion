@@ -215,6 +215,16 @@ Add per-vehicle v1 credential storage alongside legacy `sharedSecret`:
 - 32-byte secret, persisted as hex
 - selected API mode, defaulting to legacy until live Pi validation passes
 
+Current slice:
+
+- `Vehicle` persists optional `api_client_id`, `api_secret_hex`, and
+  `api_mode` fields while older JSON defaults to legacy mode.
+- `ApiPairingCredentialStore` can consume a successful
+  `ApiSessionClient.ConnectResult.Ready` pairing result and persist the
+  granted client id plus 32-byte secret hex for a matched vehicle.
+- Legacy `sharedSecret` remains present and the foreground service is not wired
+  to v1 reports.
+
 Manual and QR pairing should be updated to perform the live v1 pairing flow
 only when v1 mode is selected and the Pi API is available.
 

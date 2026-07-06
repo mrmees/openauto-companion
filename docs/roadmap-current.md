@@ -5,16 +5,16 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
 ## Now
 
 - External API v1 companion migration foundation: vendor the frozen protobuf
-  contract, add codegen, and build the codec/handshake/report/transport layer
-  beside the legacy `9876` path.
+  contract, add codegen, and build the codec/handshake/report/transport and
+  credential-storage layer beside the legacy `9876` path.
   - Rationale: the head-unit External API v1 contract is merged and frozen, so
     Companion can prepare for live client validation without destabilizing the
     current runtime path.
   - Dependency check: first Pi live-client validation is still pending; theme
     transfer retirement depends on a future web-config HTTP upload endpoint.
-  - Outcome: v1 protocol and transport foundations are unit-tested while
-    legacy service, settings, SOCKS5, and theme transfer behavior remain
-    available.
+  - Outcome: v1 protocol, transport, and credential persistence foundations
+    are unit-tested while legacy service, settings, SOCKS5, and theme transfer
+    behavior remain available.
 
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
   - Rationale: this is the highest-priority product goal for the next 60 days.

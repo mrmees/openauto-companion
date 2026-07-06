@@ -76,6 +76,53 @@ class VehicleSerializationTest {
     }
 
     @Test
+    fun roundTrip_apiV1Credentials() {
+        val secretHex = "aa".repeat(32)
+        val v = Vehicle(
+            id = "api1",
+            ssid = "ApiAP",
+            sharedSecret = "legacy-secret",
+            apiClientId = "client-123",
+            apiSecretHex = secretHex,
+            apiMode = Vehicle.ApiMode.EXTERNAL_API_V1
+        )
+
+        val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v))).single()
+
+        assertEquals("legacy-secret", result.sharedSecret)
+        assertEquals("client-123", result.apiClientId)
+        assertEquals(secretHex, result.apiSecretHex)
+        assertEquals(Vehicle.ApiMode.EXTERNAL_API_V1, result.apiMode)
+    }
+
+    @Test
+    fun fromJson_apiV1CredentialsDefaultToLegacyWhenMissing() {
+        val json = org.json.JSONObject().apply {
+            put("ssid", "OldHU")
+            put("shared_secret", "abc")
+        }
+
+        val v = Vehicle.fromJson(json)
+
+        assertNull(v.apiClientId)
+        assertNull(v.apiSecretHex)
+        assertEquals(Vehicle.ApiMode.LEGACY, v.apiMode)
+    }
+
+    @Test
+    fun fromJson_unknownApiModeDefaultsToLegacy() {
+        val json = org.json.JSONObject().apply {
+            put("ssid", "OldHU")
+            put("shared_secret", "abc")
+            put("api_mode", "future-mode")
+        }
+
+        val v = Vehicle.fromJson(json)
+
+        assertEquals(Vehicle.ApiMode.LEGACY, v.apiMode)
+    }
+
+    @Test
     fun fromJson_displayResolutionDefaultsWhenMissing() {
         val json = org.json.JSONObject().apply {
             put("ssid", "OldHU")
