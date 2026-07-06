@@ -10,8 +10,10 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
   - Rationale: the head-unit External API v1 contract is merged and frozen, so
     Companion can prepare for live client validation without destabilizing the
     current runtime path.
-  - Dependency check: first Pi live-client validation is still pending; theme
-    transfer retirement depends on a future web-config HTTP upload endpoint.
+  - Dependency check: first Pi live-client validation is blocked by refused
+    connections on v1 ports `9810` and `9811` from an app-bound Pixel Wi-Fi
+    probe; theme transfer retirement depends on a future web-config HTTP
+    upload endpoint.
   - Outcome: v1 protocol, transport, and credential persistence foundations
     are unit-tested while legacy service, settings, SOCKS5, and theme transfer
     behavior remain available.

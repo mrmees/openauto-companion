@@ -41,6 +41,35 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-06 17:52 (local)
+
+- What changed:
+  - Added an opt-in instrumentation live probe for External API v1 TCP validation from the app context.
+  - Reinstalled the debug and androidTest APKs on the Pixel and ran app-bound Wi-Fi port checks against the Pi AP host.
+  - Updated project boundary docs and roadmap with the discovered head-unit v1 listener blocker.
+- Why:
+  - Shell TCP probes cannot use the no-internet AP route, so live validation needs the same app-visible Wi-Fi `Network.socketFactory` model used by Companion runtime code.
+- Status: blocked
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: External API v1 listener availability on the head-unit AP.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Verify the deployed Prodigy build on the Pi starts External API v1 listeners on `9810` and/or `9811`.
+  - 2) Rerun the Pixel live probe after the head-unit listener is available.
+  - 3) Only after v1 live validation reaches auth/READY, proceed toward live pairing and service report cutover planning.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest` -> PASS
+  - Additional checks (if any):
+    - Opt-in guard: `am instrument ... ApiV1LiveValidationTest#tcpPortAcceptsConnectionsOverWifiNetwork` without `-e live_api_v1 true` -> SKIPPED/OK.
+    - Pixel Wi-Fi route: `ping -I wlan0 10.0.0.1` -> PASS, 0% packet loss.
+    - App-bound port probe `10.0.0.1:9876` with `-e live_api_v1 true` -> PASS.
+    - App-bound port probe `10.0.0.1:9810` with `-e live_api_v1 true` -> FAIL, `ECONNREFUSED`.
+    - App-bound port probe `10.0.0.1:9811` with `-e live_api_v1 true` -> FAIL, `ECONNREFUSED`.
+  - AA stream continuity: not tested (validation harness only; no service/runtime cutover)
+
 ## 2026-07-06 14:48 (local)
 
 - What changed:
