@@ -73,6 +73,18 @@ Current blockers:
   - Companion impact: end-to-end bridge completion and release criteria cannot be confirmed from companion validation alone.
   - Status: Open
 
+- Web-config theme/wallpaper upload endpoint for legacy `9876` retirement.
+  - Need: head-unit web-config HTTP endpoint for theme JSON plus wallpaper multipart upload/install.
+  - Why: External API v1 deliberately excludes theme/wallpaper blobs and has a 256 KiB frame cap; HTTP is the approved channel.
+  - Companion impact: theme transfer must stay on legacy `9876` until the HTTP endpoint contract ships and is integrated.
+  - Status: Requested
+
+- External API v1.1 additive fields needed for full legacy-retirement parity.
+  - Need: `SystemStatus` display dimensions, `TimeReport.timezone_id`, and `ServerHello.server_id`.
+  - Why: Companion currently gets display dimensions from legacy `hello_ack`, legacy status carries phone timezone, and every head unit AP uses `10.0.0.1` before auth without a stable server identity in v1.
+  - Companion impact: v1 foundation can proceed, but final legacy retirement and some multi-headunit/display fallbacks remain gated.
+  - Status: Requested
+
 ## Non-Goals
 
 - Building a full backend/cloud service for pairing or account management.
@@ -89,3 +101,4 @@ Current blockers:
 - 2026-02-26: Requested head-unit pairing/discovery to provide stable `vehicle_id` so companion-side identity resolution can use deterministic IDs instead of SSID-only matching.
 - 2026-02-26: Prodigy head-unit pairing/discovery is now active with stable `vehicle_id` emission; companion-side parser and pairing path consume it as available.
 - 2026-02-27: Reframed SOCKS5 bridging milestone as "companion/device control-plane validated; deterministic Pi desktop/system routing is still a pending validation and tuning area."
+- 2026-07-06: Began Companion External API v1 migration foundation against the frozen protobuf contract while preserving legacy `9876` runtime behavior.

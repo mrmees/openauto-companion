@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.protobuf")
 }
 
 android {
@@ -64,7 +65,25 @@ dependencies {
     implementation("com.github.skydoves:colorpicker-compose:1.1.3")
     implementation("com.vanniktech:android-image-cropper:4.6.0")
 
+    // OpenAuto Prodigy External API v1 protobuf runtime.
+    implementation("com.google.protobuf:protobuf-javalite:4.29.2")
+
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("org.json:json:20231013")
+}
+
+protobuf {
+    protoc {
+        artifact = "com.google.protobuf:protoc:4.29.2"
+    }
+    generateProtoTasks {
+        all().configureEach {
+            builtins {
+                create("java") {
+                    option("lite")
+                }
+            }
+        }
+    }
 }

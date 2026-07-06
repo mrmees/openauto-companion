@@ -41,6 +41,35 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-06 13:05 (local)
+
+- What changed:
+  - Added `docs/plans/api-v1-migration.md` with the legacy `9876` inventory, v1 target architecture, phased migration plan, test strategy, and gap-decision record.
+  - Vendored the frozen External API v1 protos from `../openauto-prodigy/proto/api/` into `app/src/main/proto/api/` with a source-of-truth README.
+  - Added protobuf-lite Gradle codegen and runtime dependency.
+  - Added pure JVM-tested v1 protocol foundation classes under `org.openauto.companion.net.api`: `ApiCrypto`, `ApiFrameCodec`, `ApiReports`, and `ApiHandshake`.
+  - Updated roadmap and project boundary docs for the API v1 foundation and legacy-retirement head-unit gates.
+- Why:
+  - Head-unit External API v1 is merged and frozen, so Companion can build against the contract while preserving existing legacy runtime behavior until live Pi validation.
+- Status: done
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: Web-config theme/wallpaper upload endpoint for legacy `9876` retirement; External API v1.1 additive fields needed for full legacy-retirement parity.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Add TCP `9810` and WebSocket `9811` transport adapters behind the pure codec, with fake local server tests.
+  - 2) Add v1 credential storage and pairing integration alongside the existing legacy `sharedSecret` path.
+  - 3) Schedule Pi live-client validation over the AP and LAN host/port before any service cutover.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.*"` -> PASS
+    - `./gradlew :app:generateDebugProto` -> PASS
+    - New API code scan found no references to v1.1-only fields.
+  - AA stream continuity: not tested (no service/runtime cutover in this slice)
+
 ## 2026-02-27 10:14 (local)
 
 - What changed:
