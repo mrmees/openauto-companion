@@ -41,6 +41,34 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-06 14:20 (local)
+
+- What changed:
+  - Added `ApiTransport`, `ApiTcpTransport`, `ApiWebSocketTransport`, and `ApiSessionClient` under `org.openauto.companion.net.api`.
+  - Added OkHttp WebSocket runtime dependency and MockWebServer test dependency.
+  - Added loopback TCP transport tests, MockWebServer WebSocket tests, and fake-transport session client tests.
+  - Added `docs/plans/api-v1-transport-implementation.md` and updated roadmap wording for the now-covered transport foundation.
+- Why:
+  - External API v1 needs both TCP `9810` and WebSocket `9811` adapters before live Pi validation or service integration can proceed.
+- Status: done
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: first Pi live-client validation is still pending; legacy `9876` retirement remains gated by web-config theme upload and v1.1 parity fields.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Add per-vehicle v1 credential storage beside legacy `sharedSecret`.
+  - 2) Add v1 pairing/auth integration path without removing the legacy connection path.
+  - 3) Run Pi live-client validation over AP `10.0.0.1` and LAN host/port before service report cutover.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.*"` -> PASS
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - New API code scan found no references to v1.1-only fields.
+    - Legacy `PiConnection`, `Protocol`, `ThemeTransfer`, and `CompanionService` runtime files were not changed.
+  - AA stream continuity: not tested (no service/runtime cutover in this slice)
+
 ## 2026-07-06 13:05 (local)
 
 - What changed:
