@@ -41,6 +41,35 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-06 18:52 (local)
+
+- What changed:
+  - Reran the Pixel app-bound External API v1 live probes after new Prodigy software was deployed on the Pi.
+  - Updated project boundary docs and roadmap now that v1 listeners accept connections.
+  - Added a separate blocker for live terminal rejection frame delivery after invalid known-client auth closed before a terminal frame reached Companion.
+- Why:
+  - The prior blocker was listener availability (`ECONNREFUSED` on `9810`/`9811`). The new Pi build changes that failure mode and unblocks the next pairing/known-client validation step.
+- Status: in progress
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: External API v1 terminal rejection frame delivery.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Open the head-unit External API pairing window and run a live pairing probe that requests pairing with the displayed PIN.
+  - 2) Persist the granted `client_id` and 32-byte secret, then rerun known-client auth against `9810`.
+  - 3) Capture or fix terminal `AuthReject`/`Error` delivery for invalid-auth paths before relying on live terminal-frame UX.
+- Verification:
+  - `./gradlew` gate: not run (docs-only update; no app code changed in this retry).
+  - Additional checks (if any):
+    - Pixel Wi-Fi route: `ping -I wlan0 10.0.0.1` -> PASS, 0% packet loss.
+    - App-bound port probe `10.0.0.1:9876` with `-e live_api_v1 true` -> PASS.
+    - App-bound port probe `10.0.0.1:9810` with `-e live_api_v1 true` -> PASS.
+    - App-bound port probe `10.0.0.1:9811` with `-e live_api_v1 true` -> PASS.
+    - App-bound invalid known-client TCP handshake probe on `9810` -> FAIL, connection closed before a terminal auth/error frame.
+  - AA stream continuity: not tested (validation harness only; no service/runtime cutover)
+
 ## 2026-07-06 17:52 (local)
 
 - What changed:

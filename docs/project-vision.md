@@ -87,8 +87,14 @@ Current blockers:
 
 - External API v1 listener availability on the head-unit AP.
   - Need: head unit must accept External API v1 TCP on `10.0.0.1:9810` and/or WebSocket on `10.0.0.1:9811`.
-  - Why: Companion can reach the Pi AP and legacy `9876`, but first app-bound v1 live validation from Pixel received `ECONNREFUSED` on both v1 ports.
-  - Companion impact: service report cutover and live pairing validation remain blocked beyond local protocol/transport tests until a deployed head-unit build exposes a v1 listener.
+  - Why: Companion can reach the Pi AP and legacy `9876`; first app-bound v1 live validation from Pixel initially received `ECONNREFUSED` on both v1 ports.
+  - Companion impact: listener availability no longer blocks validation; continue with pairing/known-client auth validation.
+  - Status: Delivered
+
+- External API v1 terminal rejection frame delivery.
+  - Need: remote invalid-auth/error paths should deliver terminal `AuthReject` or `Error` frames before closing the connection.
+  - Why: after the new Prodigy build exposed v1 listeners, a Pixel app-bound invalid known-client TCP probe connected to `9810` but observed connection close before a terminal auth/error frame.
+  - Companion impact: normal pairing/known-client validation can proceed, but terminal-frame handling remains unproven against live hardware until the head unit flushes terminal frames or a packet/log capture proves delivery.
   - Status: Open
 
 ## Non-Goals
@@ -109,3 +115,4 @@ Current blockers:
 - 2026-02-27: Reframed SOCKS5 bridging milestone as "companion/device control-plane validated; deterministic Pi desktop/system routing is still a pending validation and tuning area."
 - 2026-07-06: Began Companion External API v1 migration foundation against the frozen protobuf contract while preserving legacy `9876` runtime behavior.
 - 2026-07-06: First Pixel app-bound External API v1 live probe confirmed AP reachability and legacy `9876`, but v1 ports `9810` and `9811` refused connections.
+- 2026-07-06: After deploying updated Pi software, Pixel app-bound probes confirmed v1 TCP `9810` and WebSocket TCP `9811` accept connections; invalid known-client TCP auth still closed before a terminal auth/error frame.
