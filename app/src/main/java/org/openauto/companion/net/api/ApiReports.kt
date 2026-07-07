@@ -4,15 +4,19 @@ import prodigy.api.v1.Api
 import prodigy.api.v1.Companion as CompanionProto
 
 object ApiReports {
-    fun timeReport(unixTimeMs: Long): Api.ApiMessage =
-        Api.ApiMessage.newBuilder()
-            .setRequestId(0)
-            .setTimeReport(
-                CompanionProto.TimeReport.newBuilder()
-                    .setUnixTimeMs(unixTimeMs)
-                    .build()
-            )
+    fun timeReport(unixTimeMs: Long, timezoneId: String? = null): Api.ApiMessage {
+        val report = CompanionProto.TimeReport.newBuilder()
+            .setUnixTimeMs(unixTimeMs)
+            .apply {
+                if (!timezoneId.isNullOrBlank()) setTimezoneId(timezoneId)
+            }
             .build()
+
+        return Api.ApiMessage.newBuilder()
+            .setRequestId(0)
+            .setTimeReport(report)
+            .build()
+    }
 
     fun gpsReport(
         latitude: Double,

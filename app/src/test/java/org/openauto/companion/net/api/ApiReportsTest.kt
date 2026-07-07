@@ -8,12 +8,29 @@ import prodigy.api.v1.Api
 
 class ApiReportsTest {
     @Test
-    fun timeReport_usesRequestIdZeroAndV1UnixTimeOnly() {
-        val message = ApiReports.timeReport(unixTimeMs = 1_765_000_000_000L)
+    fun timeReport_usesRequestIdZeroAndSetsTimezoneWhenSupplied() {
+        val message = ApiReports.timeReport(
+            unixTimeMs = 1_765_000_000_000L,
+            timezoneId = "America/Chicago"
+        )
 
         assertEquals(0L, message.requestId)
         assertEquals(Api.ApiMessage.PayloadCase.TIME_REPORT, message.payloadCase)
         assertEquals(1_765_000_000_000L, message.timeReport.unixTimeMs)
+        assertTrue(message.timeReport.hasTimezoneId())
+        assertEquals("America/Chicago", message.timeReport.timezoneId)
+    }
+
+    @Test
+    fun timeReport_omitsTimezoneWhenMissingOrBlank() {
+        val missing = ApiReports.timeReport(unixTimeMs = 1_765_000_000_000L)
+        val blank = ApiReports.timeReport(
+            unixTimeMs = 1_765_000_000_000L,
+            timezoneId = "   "
+        )
+
+        assertFalse(missing.timeReport.hasTimezoneId())
+        assertFalse(blank.timeReport.hasTimezoneId())
     }
 
     @Test
