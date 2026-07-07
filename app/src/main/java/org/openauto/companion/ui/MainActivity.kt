@@ -245,7 +245,7 @@ class MainActivity : ComponentActivity() {
                             displayWidth = displayW ?: 1024,
                             displayHeight = displayH ?: 600,
                             onSendTheme = { themeJson, wallpaperBytes ->
-                                CompanionService.sendThemeStatic(themeJson, wallpaperBytes)
+                                CompanionService.sendThemeStatic(s.vehicle.settingsHost, themeJson, wallpaperBytes)
                             },
                             transferResult = when (val r = transferResult) {
                                 is ThemeTransfer.TransferResult.Success -> "success"
