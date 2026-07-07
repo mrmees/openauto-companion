@@ -15,6 +15,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import okhttp3.OkHttpClient
 import org.openauto.companion.CompanionApp
 import org.openauto.companion.net.PiConnection
 import org.openauto.companion.net.Protocol
@@ -338,7 +339,8 @@ class CompanionService : Service() {
     }
 
     fun sendTheme(themeJson: JSONObject, wallpaperBytes: ByteArray) {
-        val conn = connection ?: run {
+        val conn = connection
+        if (!_connected.value || conn == null || !conn.isConnected()) {
             Log.w(TAG, "sendTheme: no active connection")
             _themeTransferResult.value = ThemeTransfer.TransferResult.Failed("Not connected")
             return
@@ -346,8 +348,19 @@ class CompanionService : Service() {
         Log.i(TAG, "sendTheme: dispatching transfer (wallpaper=${wallpaperBytes.size} bytes)")
         _themeTransferResult.value = null
         themeExecutor.execute {
+            val wifiNetwork = (application as CompanionApp).wifiMonitor?.getWifiNetwork()
+            val boundClient = wifiNetwork?.let {
+                Log.i(TAG, "sendTheme: binding HTTP transfer to WiFi network")
+                OkHttpClient.Builder()
+                    .socketFactory(it.socketFactory)
+                    .build()
+            }
             try {
-                val result = ThemeTransfer.send(conn, themeJson, wallpaperBytes) { conn.readLine() }
+                val result = if (boundClient != null) {
+                    ThemeTransfer.send(null, themeJson, wallpaperBytes, boundClient)
+                } else {
+                    ThemeTransfer.send(null, themeJson, wallpaperBytes)
+                }
                 Log.i(TAG, "sendTheme: transfer complete, result=$result")
                 _themeTransferResult.value = result
             } catch (e: Exception) {
@@ -355,8 +368,15 @@ class CompanionService : Service() {
                 _themeTransferResult.value = ThemeTransfer.TransferResult.Failed(
                     e.message ?: "Transfer failed"
                 )
+            } finally {
+                boundClient?.shutdownForRequest()
             }
         }
+    }
+
+    private fun OkHttpClient.shutdownForRequest() {
+        dispatcher.executorService.shutdown()
+        connectionPool.evictAll()
     }
 
     override fun onDestroy() {
