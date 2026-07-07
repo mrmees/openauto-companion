@@ -41,6 +41,35 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-07 09:33 (local)
+
+- What changed:
+  - Refreshed vendored External API protos to the deployed v1.1 additive contract.
+  - Updated API helpers for minor version 1 and optional `TimeReport.timezone_id`.
+  - Added vehicle persistence for `ServerHello.server_id` and `SystemStatus` display dimensions.
+  - Tightened opt-in live validation ready-path assertions for v1.1 server identity.
+  - Updated migration and roadmap docs for v1.1 field-handling foundation readiness.
+- Why:
+  - Companion needs v1.1 foundation state before live pairing and service-report cutover work.
+- Status: done
+- Dependency decision:
+  - Companion-only: Yes
+  - If No, reference `Blocked by Head Unit` entry: n/a; v1.1 fields are deployed.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Add live pairing UI/service path to acquire and persist v1 credentials.
+  - 2) Validate known-client auth, subscribe snapshots, and v1 report sending against the Pi.
+  - 3) Plan the runtime report cutover while preserving legacy theme transfer on `9876`.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.ApiV11ProtoAccessTest" --tests "org.openauto.companion.net.api.ApiHandshakeTest" --tests "org.openauto.companion.net.api.ApiReportsTest" --tests "org.openauto.companion.data.VehicleSerializationTest" --tests "org.openauto.companion.net.api.ApiPairingCredentialStoreTest"` -> PASS
+  - `./gradlew :app:assembleDebugAndroidTest` -> PASS
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `git diff --check` -> PASS
+  - AA stream continuity: not tested (foundation-only; no runtime service cutover)
+
 ## 2026-07-06 22:34 (local)
 
 - What changed:
