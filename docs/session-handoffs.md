@@ -41,13 +41,14 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
-## 2026-07-07 09:33 (local)
+## 2026-07-07 09:39 (local)
 
 - What changed:
   - Refreshed vendored External API protos to the deployed v1.1 additive contract.
   - Updated API helpers for minor version 1 and optional `TimeReport.timezone_id`.
   - Added vehicle persistence for `ServerHello.server_id` and `SystemStatus` display dimensions.
   - Tightened opt-in live validation ready-path assertions for v1.1 server identity.
+  - Kept invalid-auth live validation tolerant of early close while the head-unit terminal rejection frame blocker remains open.
   - Updated migration and roadmap docs for v1.1 field-handling foundation readiness.
 - Why:
   - Companion needs v1.1 foundation state before live pairing and service-report cutover work.
