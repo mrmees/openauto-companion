@@ -134,6 +134,33 @@ class VehicleSerializationTest {
     }
 
     @Test
+    fun roundTrip_serverId() {
+        val v = Vehicle(
+            id = "local1",
+            ssid = "ApiAP",
+            sharedSecret = "legacy-secret",
+            serverId = "server-uuid-1"
+        )
+
+        val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v))).single()
+
+        assertEquals("local1", result.id)
+        assertEquals("server-uuid-1", result.serverId)
+    }
+
+    @Test
+    fun fromJson_serverIdDefaultsToNullWhenMissing() {
+        val json = org.json.JSONObject().apply {
+            put("ssid", "OldHU")
+            put("shared_secret", "abc")
+        }
+
+        val v = Vehicle.fromJson(json)
+
+        assertNull(v.serverId)
+    }
+
+    @Test
     fun emptyJson_returnsEmptyList() {
         assertEquals(emptyList<Vehicle>(), Vehicle.listFromJson(""))
     }
