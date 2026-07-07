@@ -28,7 +28,7 @@ class ApiHandshakeTest {
 
         assertEquals(Api.ApiMessage.PayloadCase.CLIENT_HELLO, hello.payloadCase)
         assertEquals(1, hello.clientHello.requestedApiVersionMajor)
-        assertEquals(0, hello.clientHello.requestedApiVersionMinor)
+        assertEquals(1, hello.clientHello.requestedApiVersionMinor)
         assertEquals("Pixel 9", hello.clientHello.clientName)
         assertEquals(Api.ClientKind.CLIENT_KIND_COMPANION, hello.clientHello.clientKind)
         assertEquals("client-123", hello.clientHello.auth.clientId)

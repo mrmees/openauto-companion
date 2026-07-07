@@ -51,7 +51,7 @@ class ApiHandshake private constructor(
             .setClientHello(
                 Api.ClientHello.newBuilder()
                     .setRequestedApiVersionMajor(1)
-                    .setRequestedApiVersionMinor(0)
+                    .setRequestedApiVersionMinor(1)
                     .setClientName(clientName)
                     .setClientKind(Api.ClientKind.CLIENT_KIND_COMPANION)
                     .setAuth(auth)
