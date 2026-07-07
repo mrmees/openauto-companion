@@ -1,5 +1,18 @@
 # AGENTS.md
 
+## Agent Workflow Policy
+
+Use Superpowers for agent planning, debugging, execution, and verification in
+this repository.
+
+Do not invoke GSD workflows, create or depend on `.planning/`, or route resume
+state through GSD for this repository unless the user explicitly asks for GSD in
+the current turn.
+
+Resume context from this file, `docs/project-vision.md`,
+`docs/roadmap-current.md`, `docs/session-handoffs.md`, and relevant
+`docs/plans/` or `docs/superpowers/` files.
+
 ## Project Management Loop
 
 For behavior-changing work in this repository:

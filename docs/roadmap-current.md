@@ -11,9 +11,10 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
     Companion can prepare for live client validation without destabilizing the
     current runtime path.
   - Dependency check: app-bound Pixel probes now reach v1 ports `9810` and
-    `9811`; full auth/READY validation still needs a pairing window or stored
-    known-client credentials. Theme transfer retirement depends on a future
-    web-config HTTP upload endpoint.
+    `9811`, and the real head-unit software now includes v1.1 fields plus
+    proxy-route teardown behavior. Full auth/READY validation still needs a
+    pairing window or stored known-client credentials. Theme transfer retirement
+    depends on a future web-config HTTP upload endpoint.
   - Outcome: v1 protocol, transport, and credential persistence foundations
     are unit-tested while legacy service, settings, SOCKS5, and theme transfer
     behavior remain available.
@@ -28,9 +29,10 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
 - Verify recent connection reliability fixes on-device.
   - Rationale: latest behavior change included Wi-Fi socket fallback (`EPERM`) and should be validated in real network conditions.
   - Outcome: confidence that fallback path and reconnect logic behave as expected across devices.
-- Operate from the balanced management loop docs.
+- Operate from the Superpowers-native management loop docs.
   - Rationale: continuity across sessions is now a core workflow requirement.
-  - Outcome: all behavior-changing sessions leave vision alignment + handoff evidence.
+  - Outcome: all behavior-changing sessions use Superpowers plus repo docs and
+    leave vision alignment + handoff evidence without GSD or `.planning` state.
 
 ## Next
 

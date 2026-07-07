@@ -19,6 +19,8 @@ OpenAuto Companion is an Android app that securely connects a phone to an OpenAu
 - Per-vehicle configuration: settings are stored and applied by vehicle identity.
 - Low-friction UX: pairing and operational controls should require minimal steps.
 - Evidence before completion: behavior-changing work must include verification output.
+- Superpowers-native workflow: agent planning and execution use Superpowers and
+  repo docs, not GSD or `.planning` state.
 - No-stream interruption: companion networking behavior must not interrupt active Android Auto media streams.
 
 ## Constraints
@@ -82,8 +84,8 @@ Current blockers:
 - External API v1.1 additive fields needed for full legacy-retirement parity.
   - Need: `SystemStatus` display dimensions, `TimeReport.timezone_id`, and `ServerHello.server_id`.
   - Why: Companion currently gets display dimensions from legacy `hello_ack`, legacy status carries phone timezone, and every head unit AP uses `10.0.0.1` before auth without a stable server identity in v1.
-  - Companion impact: v1 foundation can proceed, but final legacy retirement and some multi-headunit/display fallbacks remain gated.
-  - Status: Requested
+  - Companion impact: no longer head-unit-gated; Companion can integrate `server_id`, `timezone_id`, and display dimensions against live v1.1 hardware.
+  - Status: Delivered
 
 - External API v1 listener availability on the head-unit AP.
   - Need: head unit must accept External API v1 TCP on `10.0.0.1:9810` and/or WebSocket on `10.0.0.1:9811`.
@@ -116,3 +118,4 @@ Current blockers:
 - 2026-07-06: Began Companion External API v1 migration foundation against the frozen protobuf contract while preserving legacy `9876` runtime behavior.
 - 2026-07-06: First Pixel app-bound External API v1 live probe confirmed AP reachability and legacy `9876`, but v1 ports `9810` and `9811` refused connections.
 - 2026-07-06: After deploying updated Pi software, Pixel app-bound probes confirmed v1 TCP `9810` and WebSocket TCP `9811` accept connections; invalid known-client TCP auth still closed before a terminal auth/error frame.
+- 2026-07-06: Updated Companion workflow memory to use Superpowers, not GSD, and marked External API v1.1 parity fields plus proxy-route teardown behavior as available on the deployed head-unit software.

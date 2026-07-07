@@ -41,6 +41,32 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-06 22:34 (local)
+
+- What changed:
+  - Updated `AGENTS.md` to make Superpowers the required agent workflow and to avoid GSD/`.planning` unless explicitly requested by the user.
+  - Updated project vision and roadmap memory so External API v1.1 fields and proxy-route teardown are treated as available on the deployed head-unit software.
+  - Refreshed the parent Companion API v1.1 handoff prompt so future sessions do not inherit the obsolete "Pi is still on v1.0" caveat.
+- Why:
+  - Future Companion sessions should resume from Superpowers plus repo docs and test against the real v1.1 head-unit behavior.
+- Status: done
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: External API v1.1 additive fields needed for full legacy-retirement parity.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Resume Companion API v1.1 integration using Superpowers and the repo docs.
+  - 2) Pair against the v1.1 head unit, persist client credentials, and validate known-client auth/subscriptions/reports.
+  - 3) Validate proxy-route teardown and reconnect re-apply behavior during SOCKS5 proxy session disconnect/reconnect.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `git diff --check -- AGENTS.md docs/project-vision.md docs/roadmap-current.md docs/session-handoffs.md` -> PASS
+    - External handoff prompt inspected directly because it lives outside the Companion git repository.
+  - AA stream continuity: not tested (docs/process and dependency-memory update only)
+
 ## 2026-07-06 18:52 (local)
 
 - What changed:
