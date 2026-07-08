@@ -15,6 +15,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import okhttp3.OkHttpClient
 import org.openauto.companion.CompanionApp
 import org.openauto.companion.net.PiConnection
 import org.openauto.companion.net.Protocol
@@ -337,26 +338,41 @@ class CompanionService : Service() {
         nm.notify(NOTIFICATION_ID, buildNotification(text))
     }
 
-    fun sendTheme(themeJson: JSONObject, wallpaperBytes: ByteArray) {
-        val conn = connection ?: run {
-            Log.w(TAG, "sendTheme: no active connection")
-            _themeTransferResult.value = ThemeTransfer.TransferResult.Failed("Not connected")
-            return
-        }
-        Log.i(TAG, "sendTheme: dispatching transfer (wallpaper=${wallpaperBytes.size} bytes)")
+    fun sendTheme(settingsHost: String?, themeJson: JSONObject, wallpaperBytes: ByteArray) {
+        val targetHost = settingsHost?.trim()?.ifBlank { null }
+        val logTargetHost = targetHost ?: "10.0.0.1"
+        Log.i(TAG, "sendTheme: dispatching transfer to $logTargetHost (wallpaper=${wallpaperBytes.size} bytes)")
         _themeTransferResult.value = null
         themeExecutor.execute {
+            val wifiNetwork = (application as CompanionApp).wifiMonitor?.getWifiNetwork()
+            val boundClient = wifiNetwork?.let {
+                Log.i(TAG, "sendTheme: binding HTTP transfer to WiFi network for $logTargetHost")
+                OkHttpClient.Builder()
+                    .socketFactory(it.socketFactory)
+                    .build()
+            }
             try {
-                val result = ThemeTransfer.send(conn, themeJson, wallpaperBytes) { conn.readLine() }
-                Log.i(TAG, "sendTheme: transfer complete, result=$result")
+                val result = if (boundClient != null) {
+                    ThemeTransfer.send(targetHost, themeJson, wallpaperBytes, boundClient)
+                } else {
+                    ThemeTransfer.send(targetHost, themeJson, wallpaperBytes)
+                }
+                Log.i(TAG, "sendTheme: transfer complete for $logTargetHost, result=$result")
                 _themeTransferResult.value = result
             } catch (e: Exception) {
-                Log.e(TAG, "sendTheme: transfer failed with exception", e)
+                Log.e(TAG, "sendTheme: transfer failed for $logTargetHost with exception", e)
                 _themeTransferResult.value = ThemeTransfer.TransferResult.Failed(
                     e.message ?: "Transfer failed"
                 )
+            } finally {
+                boundClient?.shutdownForRequest()
             }
         }
+    }
+
+    private fun OkHttpClient.shutdownForRequest() {
+        dispatcher.executorService.shutdown()
+        connectionPool.evictAll()
     }
 
     override fun onDestroy() {
@@ -409,8 +425,8 @@ class CompanionService : Service() {
         private val _themeTransferResult = MutableStateFlow<ThemeTransfer.TransferResult?>(null)
         val themeTransferResult: StateFlow<ThemeTransfer.TransferResult?> = _themeTransferResult.asStateFlow()
 
-        fun sendThemeStatic(themeJson: JSONObject, wallpaperBytes: ByteArray) {
-            instance?.sendTheme(themeJson, wallpaperBytes)
+        fun sendThemeStatic(settingsHost: String?, themeJson: JSONObject, wallpaperBytes: ByteArray) {
+            instance?.sendTheme(settingsHost, themeJson, wallpaperBytes)
                 ?: run { _themeTransferResult.value = ThemeTransfer.TransferResult.Failed("Service not running") }
         }
 

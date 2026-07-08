@@ -75,11 +75,11 @@ Current blockers:
   - Companion impact: end-to-end bridge completion and release criteria cannot be confirmed from companion validation alone.
   - Status: Open
 
-- Web-config theme/wallpaper upload endpoint for legacy `9876` retirement.
+- Web-config theme/wallpaper upload endpoint for theme/wallpaper legacy `9876` retirement.
   - Need: head-unit web-config HTTP endpoint for theme JSON plus wallpaper multipart upload/install.
   - Why: External API v1 deliberately excludes theme/wallpaper blobs and has a 256 KiB frame cap; HTTP is the approved channel.
-  - Companion impact: theme transfer must stay on legacy `9876` until the HTTP endpoint contract ships and is integrated.
-  - Status: Requested
+  - Companion impact: Companion now installs themes through `POST /api/theme/install`; non-theme legacy `9876` runtime traffic is tracked separately.
+  - Status: Delivered
 
 - External API v1.1 additive fields needed for full legacy-retirement parity.
   - Need: `SystemStatus` display dimensions, `TimeReport.timezone_id`, and `ServerHello.server_id`.
@@ -119,3 +119,4 @@ Current blockers:
 - 2026-07-06: First Pixel app-bound External API v1 live probe confirmed AP reachability and legacy `9876`, but v1 ports `9810` and `9811` refused connections.
 - 2026-07-06: After deploying updated Pi software, Pixel app-bound probes confirmed v1 TCP `9810` and WebSocket TCP `9811` accept connections; invalid known-client TCP auth still closed before a terminal auth/error frame.
 - 2026-07-06: Updated Companion workflow memory to use Superpowers, not GSD, and marked External API v1.1 parity fields plus proxy-route teardown behavior as available on the deployed head-unit software.
+- 2026-07-07: Migrated Companion theme/wallpaper transfer from legacy `9876` chunks to the delivered web-config HTTP install endpoint.
