@@ -1,13 +1,9 @@
 package org.openauto.companion.ui
 
 import android.Manifest
-import android.content.ActivityNotFoundException
-import android.content.Intent
-import android.net.Uri
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -208,17 +204,7 @@ class MainActivity : ComponentActivity() {
                                 prefs.updateVehicle(vehicle.id) { v -> v.copy(audioKeepAlive = it) }
                             },
                             onOpenSettingsPage = {
-                                val url = SettingsUrlBuilder.build(vehicle.settingsHost, vehicle.settingsPort)
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                                try {
-                                    startActivity(intent)
-                                } catch (_: ActivityNotFoundException) {
-                                    Toast.makeText(
-                                        this,
-                                        "No browser app available to open settings.",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
+                                screen = Screen.WebConfig(vehicle)
                             },
                             onOpenThemeBuilder = {
                                 screen = Screen.ThemeBuilder(vehicle)
@@ -252,6 +238,16 @@ class MainActivity : ComponentActivity() {
                                 is ThemeTransfer.TransferResult.Failed -> r.reason
                                 null -> null
                             },
+                            onBack = { screen = Screen.Status(s.vehicle) }
+                        )
+                    }
+                    is Screen.WebConfig -> {
+                        val url = SettingsUrlBuilder.build(s.vehicle.settingsHost, s.vehicle.settingsPort)
+                        val wifiNetwork = (application as CompanionApp).wifiMonitor?.getWifiNetwork()
+                        WebConfigScreen(
+                            vehicleName = s.vehicle.name,
+                            url = url,
+                            wifiNetwork = wifiNetwork,
                             onBack = { screen = Screen.Status(s.vehicle) }
                         )
                     }
@@ -309,4 +305,5 @@ private sealed class Screen {
     data object QrScan : Screen()
     data class Status(val vehicle: Vehicle) : Screen()
     data class ThemeBuilder(val vehicle: Vehicle) : Screen()
+    data class WebConfig(val vehicle: Vehicle) : Screen()
 }
