@@ -132,6 +132,28 @@ class ThemeTransferTest {
     }
 
     @Test
+    fun sendToUrl_mapsQtAppNotRunningResponseToFailedReason() {
+        val server = MockWebServer()
+        val client = OkHttpClient()
+        server.enqueue(MockResponse().setResponseCode(503).setBody("""{"installed":false}"""))
+        server.start()
+
+        try {
+            val result = ThemeTransfer.sendToUrl(
+                url = server.url("/api/theme/install"),
+                themeJson = sampleTheme(),
+                wallpaperBytes = "jpeg-bytes".toByteArray(),
+                client = client
+            )
+
+            assertEquals(ThemeTransfer.TransferResult.Failed("Qt app not running"), result)
+        } finally {
+            client.shutdownForTest()
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun sendToUrl_mapsNonJsonPayloadTooLargeResponseToStatusFallback() {
         val server = MockWebServer()
         val client = OkHttpClient()
