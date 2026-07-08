@@ -28,6 +28,13 @@ For behavior-changing work in this repository:
    - next 1-3 steps
    - verification commands/results
 
+## Local Environment Notes
+
+When installing or debugging on the Pixel from WSL, use the Windows SDK ADB
+binary at `/mnt/e/Android/Sdk/platform-tools/adb.exe` (Windows path:
+`E:\Android\Sdk\platform-tools\adb.exe`). The Linux `/usr/bin/adb` may not see
+the USB-connected phone.
+
 ## Scope Note
 
 This local file defines repo-specific workflow expectations. Platform-level safety and skill instructions still apply.
