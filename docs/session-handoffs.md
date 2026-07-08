@@ -41,6 +41,63 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-07 19:48 (local)
+
+- What changed:
+  - Added an Android network-security config and referenced it from the app manifest.
+  - Allowed cleartext HTTP only for the head-unit web-config host `10.0.0.1`, preserving the default block for other destinations.
+  - Added a unit test that verifies the manifest uses the config and that cleartext is not enabled app-wide.
+- Why:
+  - Live Pixel testing showed Android blocked the new HTTP theme install with `cleartext communication to 10.0.0.1 not permitted by network security policy` before the request reached the head unit.
+- Status: done
+- Dependency decision:
+  - Companion-only: Yes
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Decide whether TLS for the web-config API should become a separate Companion/head-unit contract update.
+  - 2) Merge or PR `feat/theme-http-install`.
+  - 3) Continue External API runtime migration for non-theme legacy `9876` traffic.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `./gradlew :app:testDebugUnitTest --tests org.openauto.companion.net.NetworkSecurityConfigTest` -> PASS
+    - `/mnt/e/Android/Sdk/platform-tools/adb.exe -s 39260DLJH000LX install -r app/build/outputs/apk/debug/app-debug.apk` -> PASS
+    - `/mnt/e/Android/Sdk/platform-tools/adb.exe -s 39260DLJH000LX shell monkey -p org.openauto.companion 1` -> PASS
+    - Live Pixel theme install against the head-unit AP HTTP endpoint -> PASS (user-confirmed)
+  - AA stream continuity: not tested (network-security config/build/install only)
+
+## 2026-07-07 18:50 (local)
+
+- What changed:
+  - Replaced legacy `9876` theme/wallpaper chunk transfer with one OkHttp multipart POST to the head-unit web-config theme install endpoint.
+  - Sent `manifest` as a no-filename form field and wallpaper as optional `image/jpeg` file part `wallpaper.jpg`.
+  - Updated theme install result handling so server `installed:false`, HTTP errors, malformed responses, and network failures surface as visible failures.
+  - Passed the selected vehicle web-config host into theme installs, falling back to `10.0.0.1`.
+  - Bound theme install HTTP requests to the matched Wi-Fi network when available.
+  - Marked the delivered head-unit HTTP theme endpoint in project docs and roadmap.
+- Why:
+  - The head unit now ships the verified HTTP theme install endpoint, so theme transfer no longer needs the legacy `9876` chunk/HMAC/ack protocol.
+- Status: done
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: Web-config theme/wallpaper upload endpoint for theme/wallpaper legacy `9876` retirement.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Run an optional live install against `10.0.0.1:8080` on real head-unit AP hardware.
+  - 2) Continue External API runtime migration for non-theme legacy `9876` traffic.
+  - 3) Remove legacy theme message builders after no remaining code references them.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.ThemeTransferTest"` -> PASS
+    - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.ProtocolTest"` -> PASS
+    - `./gradlew :app:assembleDebug` -> PASS
+  - AA stream continuity: not tested (unit/build validation only; no runtime media/session behavior changed)
+
 ## 2026-02-27 10:14 (local)
 
 - What changed:

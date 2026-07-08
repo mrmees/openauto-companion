@@ -73,6 +73,12 @@ Current blockers:
   - Companion impact: end-to-end bridge completion and release criteria cannot be confirmed from companion validation alone.
   - Status: Open
 
+- Web-config theme/wallpaper upload endpoint for theme/wallpaper legacy `9876` retirement.
+  - Need: head-unit web-config HTTP endpoint for theme JSON plus wallpaper multipart upload/install.
+  - Why: External API v1 deliberately excludes theme/wallpaper blobs and has a 256 KiB frame cap; HTTP is the approved channel.
+  - Companion impact: Companion now installs themes through `POST /api/theme/install`; non-theme legacy `9876` runtime traffic is tracked separately.
+  - Status: Delivered
+
 ## Non-Goals
 
 - Building a full backend/cloud service for pairing or account management.
@@ -89,3 +95,4 @@ Current blockers:
 - 2026-02-26: Requested head-unit pairing/discovery to provide stable `vehicle_id` so companion-side identity resolution can use deterministic IDs instead of SSID-only matching.
 - 2026-02-26: Prodigy head-unit pairing/discovery is now active with stable `vehicle_id` emission; companion-side parser and pairing path consume it as available.
 - 2026-02-27: Reframed SOCKS5 bridging milestone as "companion/device control-plane validated; deterministic Pi desktop/system routing is still a pending validation and tuning area."
+- 2026-07-07: Migrated Companion theme/wallpaper transfer from legacy `9876` chunks to the delivered web-config HTTP install endpoint.
