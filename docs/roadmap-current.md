@@ -16,9 +16,9 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
     pairing window or stored known-client credentials. Theme transfer now uses
     the delivered web-config HTTP upload endpoint, while non-theme legacy
     traffic remains available during the broader runtime migration.
-  - Outcome: v1 protocol, transport, and credential persistence foundations
-    are unit-tested while legacy service, settings, SOCKS5, and theme transfer
-    behavior remain available.
+  - Outcome: v1 protocol, transport, credential persistence, and v1.1
+    field-handling foundations are unit-tested while legacy service, settings,
+    SOCKS5, and theme transfer behavior remain available.
 
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
   - Rationale: this is the highest-priority product goal for the next 60 days.

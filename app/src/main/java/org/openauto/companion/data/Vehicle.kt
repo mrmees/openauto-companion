@@ -12,6 +12,7 @@ data class Vehicle(
     val apiClientId: String? = null,
     val apiSecretHex: String? = null,
     val apiMode: ApiMode = ApiMode.LEGACY,
+    val serverId: String? = null,
     val socks5Enabled: Boolean = true,
     val audioKeepAlive: Boolean = false,
     val settingsHost: String? = null,
@@ -36,6 +37,7 @@ data class Vehicle(
         put("shared_secret", sharedSecret)
         if (!apiClientId.isNullOrBlank()) put("api_client_id", apiClientId)
         if (!apiSecretHex.isNullOrBlank()) put("api_secret_hex", apiSecretHex)
+        if (!serverId.isNullOrBlank()) put("server_id", serverId)
         if (apiMode != ApiMode.LEGACY) put("api_mode", apiMode.jsonValue)
         put("socks5_enabled", socks5Enabled)
         put("audio_keep_alive", audioKeepAlive)
@@ -57,6 +59,7 @@ data class Vehicle(
             apiClientId = json.optString("api_client_id", "").ifBlank { null },
             apiSecretHex = json.optString("api_secret_hex", "").ifBlank { null },
             apiMode = ApiMode.fromJson(json.optString("api_mode", ApiMode.LEGACY.jsonValue)),
+            serverId = json.optString("server_id", "").ifBlank { null },
             socks5Enabled = json.optBoolean("socks5_enabled", true),
             audioKeepAlive = json.optBoolean("audio_keep_alive", false),
             settingsHost = json.optString("settings_host", "").ifBlank { null },

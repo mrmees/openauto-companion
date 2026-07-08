@@ -39,12 +39,10 @@ Rules:
 
 - Treat vendored protos as generated-input copies, not local design files.
 - Never edit field numbers, names, package, or semantics in this repo.
-- Target v1 exactly.
-- Do not reference approved-but-unimplemented v1.1 fields:
-  `SystemStatus` display dimensions, `TimeReport.timezone_id`, or
-  `ServerHello.server_id`.
-- Feature detection in future v1.1 work must use field presence, not minor
-  version comparison.
+- Target the deployed additive v1.1 contract.
+- Use field presence for `SystemStatus` display dimensions,
+  `TimeReport.timezone_id`, and `ServerHello.server_id`.
+- Feature detection must use field presence, not minor version comparison.
 
 ## Current Legacy Inventory
 
@@ -63,8 +61,9 @@ Target mapping:
 
 - Connection mechanics move to a future v1 client with configurable host/port:
   TCP `9810` length-prefixed protobuf and WebSocket `9811` binary protobuf.
-- Display dimensions have no v1 field. Keep legacy display parsing as fallback
-  until v1.1 ships.
+- Display dimensions are available from `SystemStatus.display_width` and
+  `display_height` when the server supplies them. Keep legacy display parsing
+  only as a runtime fallback until service cutover is complete.
 - Legacy `PiConnection` stays for service/runtime traffic in this phase.
 
 ### `app/src/main/java/org/openauto/companion/net/Protocol.kt`
@@ -81,6 +80,8 @@ Target mapping:
 - v1 reports are separate protobuf messages:
   `TimeReport`, `GpsReport`, `BatteryReport`, `ConnectivityReport`, each
   sent as `ApiMessage` with `request_id = 0`.
+- `TimeReport.timezone_id` should be sent whenever the phone can provide a
+  non-blank IANA timezone id.
 - Legacy theme JSON/chunk messages remain on `9876` until the head-unit
   web-config HTTP upload endpoint is implemented.
 
@@ -138,8 +139,9 @@ Target mapping:
 - v1 pairing cannot persist a v1 secret until the server sends
   `PairingChallenge.salt`. Future UI/service integration must drive the live
   pairing exchange, then persist `client_id` plus 32-byte secret per vehicle.
-- Until `ServerHello.server_id` lands in v1.1, multi-vehicle identity remains
-  QR `vehicle_id` plus SSID mapping.
+- `ServerHello.server_id` is the stable head-unit identity for future
+  vehicle-key migration. This slice persists it without changing existing
+  local vehicle matching.
 - Settings URL stays HTTP convention-based. No API field is planned.
 
 ## Target Architecture
@@ -172,7 +174,8 @@ Create `org.openauto.companion.net.api` as a pure protocol package:
   - pure builders for `TimeReport`, `GpsReport`, `BatteryReport`, and
     `ConnectivityReport`
   - all report envelopes use `request_id = 0`
-  - no v1.1 fields
+  - include `TimeReport.timezone_id` when a non-blank IANA timezone id is
+    available
 
 Transport adapters for TCP and WebSocket are a later phase. The first slice
 keeps networking out of these classes so they remain unit-testable on the JVM.
@@ -245,10 +248,11 @@ Do not remove legacy `9876` until all gates are met:
 
 - Pi live-client validation over the real AP and LAN host/port succeeds.
 - Web-config HTTP theme/wallpaper upload endpoint exists and is integrated.
-- v1.1 display dimensions ship or theme builder has another accepted display
-  dimension source.
-- v1.1 server identity ships or multi-headunit identity ambiguity is otherwise
-  resolved.
+- Display dimensions come from `SystemStatus.display_width` and
+  `display_height` when supplied, with legacy display parsing retained only as
+  a runtime fallback through service cutover.
+- `ServerHello.server_id` remains persisted for future vehicle-key migration
+  without changing existing local vehicle matching in this slice.
 
 ## Test Strategy
 
@@ -278,7 +282,8 @@ Phase 1 tests are pure JVM unit tests:
 - `ApiReportsTest`
   - report envelopes use `request_id = 0`
   - connectivity report includes password when supplied
-  - time report contains only v1 `unix_time_ms`
+  - time report includes `timezone_id` when a non-blank IANA timezone id is
+    supplied
 
 Repo gate:
 
@@ -288,11 +293,14 @@ Repo gate:
 
 1. Theme/wallpaper transfer moves to future web-config HTTP, not External API.
    Keep legacy `ThemeTransfer.kt` until that endpoint ships.
-2. Display dimensions are v1.1, not v1. Use legacy fallback only in this
-   migration.
-3. Phone timezone is v1.1, not v1. Send only `TimeReport.unix_time_ms` in v1.
-4. `ServerHello.server_id` is v1.1, not v1. Keep current vehicle identity
-   approach.
+2. Display dimensions are available from `SystemStatus.display_width` and
+   `display_height` when the server supplies them. Keep legacy display parsing
+   only as a runtime fallback until service cutover is complete.
+3. `TimeReport.timezone_id` should be sent whenever the phone can provide a
+   non-blank IANA timezone id.
+4. `ServerHello.server_id` is the stable head-unit identity for future
+   vehicle-key migration. This slice persists it without changing existing
+   local vehicle matching.
 5. SOCKS5 username is password-only by convention. Future v1 integration
    should validate only password and accept any username.
 6. Head-unit proxy-route status is wishlisted, not v1. Companion UI remains
