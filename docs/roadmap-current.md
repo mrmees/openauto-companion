@@ -13,8 +13,9 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
   - Dependency check: app-bound Pixel probes now reach v1 ports `9810` and
     `9811`, and the real head-unit software now includes v1.1 fields plus
     proxy-route teardown behavior. Full auth/READY validation still needs a
-    pairing window or stored known-client credentials. Theme transfer retirement
-    depends on a future web-config HTTP upload endpoint.
+    pairing window or stored known-client credentials. Theme transfer now uses
+    the delivered web-config HTTP upload endpoint, while non-theme legacy
+    traffic remains available during the broader runtime migration.
   - Outcome: v1 protocol, transport, credential persistence, and v1.1
     field-handling foundations are unit-tested while legacy service, settings,
     SOCKS5, and theme transfer behavior remain available.
