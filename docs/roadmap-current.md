@@ -27,6 +27,15 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
 - Preserve Android Auto stream continuity during all bridge and networking changes.
   - Rationale: AA playback must remain uninterrupted; networking features are additive.
   - Outcome: all connection/retry/recovery actions are tested for no interruption to active AA stream sessions.
+- In-app web config over Android Auto Wi-Fi: replace external browser launch
+  with a Companion-hosted WebView bound to the matched head-unit Wi-Fi network.
+  - Rationale: Android Auto owns the Prodigy AP network, so ordinary browser
+    traffic can route over cellular even when the phone has a valid `10.0.0.x`
+    Wi-Fi address and Companion-bound traffic works.
+  - Dependency check: companion-only; reuses the delivered web-config service
+    and the existing `WifiMonitor` matched network.
+  - Outcome: the Settings action opens the web-config panel in app without
+    requiring the AA Wi-Fi network to become Android's default route.
 - Verify recent connection reliability fixes on-device.
   - Rationale: latest behavior change included Wi-Fi socket fallback (`EPERM`) and should be validated in real network conditions.
   - Outcome: confidence that fallback path and reconnect logic behave as expected across devices.

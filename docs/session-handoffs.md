@@ -41,6 +41,36 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-08 11:22 (local)
+
+- What changed:
+  - Replaced the Status screen Settings action's external browser launch with an in-app WebView screen.
+  - Added process-network binding around the WebView so the page can use the matched Android Auto/head-unit Wi-Fi `Network`.
+  - Added a small binding coordinator with unit tests for bind, restore, missing-network, and failed-bind behavior.
+  - Added inline WebView warnings for missing or rejected network binding.
+  - Added Superpowers design and implementation plan docs for this feature branch.
+- Why:
+  - Pixel diagnostics showed the phone had `10.0.0.21/24` on the Prodigy AP and forced Wi-Fi ping to `10.0.0.1` worked, but unbound traffic to `10.0.0.1` routed over cellular. External browsers cannot use Companion's bound network route, so web config must run in app.
+- Status: done
+- Dependency decision:
+  - Companion-only: Yes
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) On Pixel, open Companion -> vehicle status -> Settings while Android Auto is connected.
+  - 2) Confirm the web config page loads in app and back navigation returns to vehicle status.
+  - 3) Confirm AA audio remains uninterrupted while opening and closing web config.
+- Verification:
+  - `ANDROID_HOME=/mnt/e/claude/personal/openautopro/openauto-companion/.gradle/android-sdk ./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `ANDROID_HOME=/mnt/e/claude/personal/openautopro/openauto-companion/.gradle/android-sdk ./gradlew :app:testDebugUnitTest --tests org.openauto.companion.net.ProcessNetworkBindingTest` -> PASS
+    - `ANDROID_HOME=/mnt/e/claude/personal/openautopro/openauto-companion/.gradle/android-sdk ./gradlew :app:testDebugUnitTest --tests org.openauto.companion.ui.WebConfigBindingWarningTest` -> PASS
+    - `ANDROID_HOME=/mnt/e/claude/personal/openautopro/openauto-companion/.gradle/android-sdk ./gradlew :app:assembleDebug` -> PASS
+    - `git diff --check` -> PASS
+    - `/mnt/e/Android/Sdk/platform-tools/adb.exe -s 39260DLJH000LX install -r app/build/outputs/apk/debug/app-debug.apk` -> PASS
+  - AA stream continuity: not tested
+
 ## 2026-07-07 19:48 (local)
 
 - What changed:
