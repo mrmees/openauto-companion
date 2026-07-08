@@ -56,15 +56,16 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
   - Source item: n/a
   - Promotion result: Not promoted
 - Next steps:
-  - 1) Retry the live theme install from the Pixel while connected to the head-unit AP.
-  - 2) If install reaches the server but fails, use the surfaced HTTP error (`missing manifest`, `payload too large`, `Qt app not running`, etc.) to distinguish payload vs. head-unit state.
-  - 3) Decide whether TLS for the web-config API should become a separate Companion/head-unit contract update.
+  - 1) Decide whether TLS for the web-config API should become a separate Companion/head-unit contract update.
+  - 2) Merge or PR `feat/theme-http-install`.
+  - 3) Continue External API runtime migration for non-theme legacy `9876` traffic.
 - Verification:
   - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
   - Additional checks (if any):
     - `./gradlew :app:testDebugUnitTest --tests org.openauto.companion.net.NetworkSecurityConfigTest` -> PASS
     - `/mnt/e/Android/Sdk/platform-tools/adb.exe -s 39260DLJH000LX install -r app/build/outputs/apk/debug/app-debug.apk` -> PASS
     - `/mnt/e/Android/Sdk/platform-tools/adb.exe -s 39260DLJH000LX shell monkey -p org.openauto.companion 1` -> PASS
+    - Live Pixel theme install against the head-unit AP HTTP endpoint -> PASS (user-confirmed)
   - AA stream continuity: not tested (network-security config/build/install only)
 
 ## 2026-07-07 18:50 (local)
