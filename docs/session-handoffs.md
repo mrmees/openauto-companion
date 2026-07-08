@@ -41,6 +41,32 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-07 19:48 (local)
+
+- What changed:
+  - Added an Android network-security config and referenced it from the app manifest.
+  - Allowed cleartext HTTP only for the head-unit web-config host `10.0.0.1`, preserving the default block for other destinations.
+  - Added a unit test that verifies the manifest uses the config and that cleartext is not enabled app-wide.
+- Why:
+  - Live Pixel testing showed Android blocked the new HTTP theme install with `cleartext communication to 10.0.0.1 not permitted by network security policy` before the request reached the head unit.
+- Status: done
+- Dependency decision:
+  - Companion-only: Yes
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Retry the live theme install from the Pixel while connected to the head-unit AP.
+  - 2) If install reaches the server but fails, use the surfaced HTTP error (`missing manifest`, `payload too large`, `Qt app not running`, etc.) to distinguish payload vs. head-unit state.
+  - 3) Decide whether TLS for the web-config API should become a separate Companion/head-unit contract update.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - `./gradlew :app:testDebugUnitTest --tests org.openauto.companion.net.NetworkSecurityConfigTest` -> PASS
+    - `/mnt/e/Android/Sdk/platform-tools/adb.exe -s 39260DLJH000LX install -r app/build/outputs/apk/debug/app-debug.apk` -> PASS
+    - `/mnt/e/Android/Sdk/platform-tools/adb.exe -s 39260DLJH000LX shell monkey -p org.openauto.companion 1` -> PASS
+  - AA stream continuity: not tested (network-security config/build/install only)
+
 ## 2026-07-07 18:50 (local)
 
 - What changed:
