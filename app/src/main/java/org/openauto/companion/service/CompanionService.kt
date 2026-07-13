@@ -19,6 +19,7 @@ import okhttp3.OkHttpClient
 import org.openauto.companion.CompanionApp
 import org.openauto.companion.net.PiConnection
 import org.openauto.companion.net.Protocol
+import org.openauto.companion.net.CellularUpstreamMonitor
 import org.openauto.companion.net.Socks5Server
 import org.openauto.companion.net.ThemeTransfer
 import org.openauto.companion.ui.MainActivity
@@ -40,6 +41,7 @@ class CompanionService : Service() {
     private var retryTask: ScheduledFuture<*>? = null
     private val seq = AtomicInteger(0)
     private var socks5Server: Socks5Server? = null
+    private var cellularUpstreamMonitor: CellularUpstreamMonitor? = null
     private var silentPlayer: SilentAudioPlayer? = null
     private var connecting = false
     private var _currentVehicleName = "OpenAuto Prodigy"
@@ -216,20 +218,28 @@ class CompanionService : Service() {
         try {
             val cm = getSystemService(ConnectivityManager::class.java)
             // Use "oap" + first 8 chars of secret as credentials
-            val user = "oap"
             val pass = if (secret.length >= 8) secret.substring(0, 8) else secret
+            val upstreamMonitor = CellularUpstreamMonitor(cm) { network ->
+                if (network == null) {
+                    Log.i(TAG, "Cellular upstream unavailable for proxy egress")
+                } else {
+                    Log.i(TAG, "Cellular upstream available for proxy egress")
+                }
+            }.also { it.start() }
+            cellularUpstreamMonitor = upstreamMonitor
             socks5Server = Socks5Server(
                 port = 1080,
-                username = user,
                 password = pass,
-                connectivityManager = cm
+                upstreamNetworkProvider = { upstreamMonitor.currentNetwork }
             )
             socks5Server!!.start()
             _socks5Active.value = true
-            Log.i(TAG, "SOCKS5 proxy started on port 1080 (user=$user)")
+            Log.i(TAG, "SOCKS5 proxy started on port 1080")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start SOCKS5 proxy", e)
             socks5Server = null
+            cellularUpstreamMonitor?.close()
+            cellularUpstreamMonitor = null
         }
     }
 
@@ -248,6 +258,8 @@ class CompanionService : Service() {
 
         socks5Server?.stop()
         socks5Server = null
+        cellularUpstreamMonitor?.close()
+        cellularUpstreamMonitor = null
         silentPlayer?.stop()
         silentPlayer = null
 

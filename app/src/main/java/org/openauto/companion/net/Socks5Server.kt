@@ -1,9 +1,6 @@
 package org.openauto.companion.net
 
-import android.net.ConnectivityManager
 import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.util.Log
 import java.io.InputStream
 import java.io.OutputStream
@@ -11,6 +8,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -20,41 +18,31 @@ import java.util.concurrent.atomic.AtomicInteger
 class Socks5Server(
     private val port: Int = 1080,
     private val bindAddress: String = "0.0.0.0",
-    private val username: String,
     private val password: String,
-    private val connectivityManager: ConnectivityManager? = null
+    private val upstreamNetworkProvider: () -> Network? = { null }
 ) {
     private var serverSocket: ServerSocket? = null
     private val running = AtomicBoolean(false)
     private val executor: ExecutorService = Executors.newCachedThreadPool()
     private val connectionCount = AtomicInteger(0)
     private val failedAuths = ConcurrentHashMap<String, Pair<Int, Long>>()
-    private var cellularNetwork: Network? = null
     private var acceptThread: Thread? = null
 
     val isActive: Boolean get() = running.get()
+    val listeningPort: Int get() = serverSocket?.localPort ?: 0
 
     fun start() {
-        if (running.getAndSet(true)) return
+        if (!running.compareAndSet(false, true)) return
 
-        connectivityManager?.let { cm ->
-            val request = NetworkRequest.Builder()
-                .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-            cm.requestNetwork(request, object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    cellularNetwork = network
-                    Log.i(TAG, "Cellular network available for proxy egress")
-                }
-                override fun onLost(network: Network) {
-                    if (cellularNetwork == network) cellularNetwork = null
-                }
-            })
+        try {
+            serverSocket = ServerSocket()
+            serverSocket!!.bind(InetSocketAddress(bindAddress, port))
+        } catch (error: Exception) {
+            running.set(false)
+            try { serverSocket?.close() } catch (_: Exception) {}
+            serverSocket = null
+            throw error
         }
-
-        serverSocket = ServerSocket()
-        serverSocket!!.bind(InetSocketAddress(bindAddress, port))
 
         acceptThread = Thread({
             Log.i(TAG, "SOCKS5 server listening on $bindAddress:$port")
@@ -76,9 +64,11 @@ class Socks5Server(
     }
 
     fun stop() {
-        running.set(false)
+        if (!running.getAndSet(false)) return
         try { serverSocket?.close() } catch (_: Exception) {}
         acceptThread?.join(2000)
+        acceptThread = null
+        serverSocket = null
         executor.shutdownNow()
     }
 
@@ -125,7 +115,7 @@ class Socks5Server(
             if (authLen < 5) return
             val (user, pass) = parseAuthRequest(authBuf.copyOf(authLen))
 
-            if (user != username || pass != password) {
+            if (!credentialsAccepted(user, pass)) {
                 output.write(byteArrayOf(0x01, 0x01))
                 output.flush()
                 val entry = failedAuths.getOrDefault(clientIp, Pair(0, 0L))
@@ -152,7 +142,7 @@ class Socks5Server(
             }
 
             val remote = Socket()
-            cellularNetwork?.bindSocket(remote)
+            upstreamNetworkProvider()?.bindSocket(remote)
 
             try {
                 remote.connect(InetSocketAddress(destHost, destPort), CONNECT_TIMEOUT_MS)
@@ -259,4 +249,11 @@ class Socks5Server(
             return user to pass
         }
     }
+
+    @Suppress("UNUSED_PARAMETER")
+    internal fun credentialsAccepted(username: String, candidatePassword: String): Boolean =
+        MessageDigest.isEqual(
+            password.toByteArray(Charsets.UTF_8),
+            candidatePassword.toByteArray(Charsets.UTF_8)
+        )
 }

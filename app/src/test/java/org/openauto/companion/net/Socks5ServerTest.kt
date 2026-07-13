@@ -35,4 +35,38 @@ class Socks5ServerTest {
         assertEquals("prodigy", u)
         assertEquals("secret123", p)
     }
+
+    @Test
+    fun credentialsAccepted_allowsAnyUsernameWithCorrectPassword() {
+        val server = Socks5Server(password = "secret123")
+
+        assertTrue(server.credentialsAccepted("oap", "secret123"))
+        assertTrue(server.credentialsAccepted("prodigy", "secret123"))
+        assertTrue(server.credentialsAccepted("anything", "secret123"))
+    }
+
+    @Test
+    fun credentialsAccepted_rejectsWrongPassword() {
+        val server = Socks5Server(password = "secret123")
+
+        assertFalse(server.credentialsAccepted("oap", "wrong"))
+    }
+
+    @Test
+    fun startAndStop_areIdempotentWithoutDoubleBinding() {
+        val server = Socks5Server(port = 0, password = "secret123")
+
+        try {
+            server.start()
+            val firstPort = server.listeningPort
+            server.start()
+
+            assertTrue(firstPort > 0)
+            assertEquals(firstPort, server.listeningPort)
+            assertTrue(server.isActive)
+        } finally {
+            server.stop()
+            server.stop()
+        }
+    }
 }
