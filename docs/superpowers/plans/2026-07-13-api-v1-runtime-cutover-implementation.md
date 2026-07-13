@@ -26,6 +26,17 @@ tests.
 **Design:**
 `docs/superpowers/specs/2026-07-13-api-v1-runtime-cutover-design.md`
 
+## Execution Status (2026-07-13)
+
+- Tasks 1–9: complete in focused green commits through `1bcef52`.
+- Task 10: instrumentation update complete in `202f684`; AndroidTest APK
+  compiles. The no-flag device guard run is pending because Windows ADB had no
+  attached device during implementation.
+- Task 11: JVM regression groups, mandatory unit/build gate, structural scans,
+  and the bench-ready documentation/handoff are complete in the working tree.
+- Task 12: live Pixel/Prodigy cutover bench pending with Matthew. No live
+  pairing window has been consumed and no hardware-pass claim has been made.
+
 ---
 
 ## Global Scope Guards

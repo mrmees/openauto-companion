@@ -591,3 +591,65 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
   - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> NOT RUN (docs/process-only changes)
   - Additional checks (if any):
     - AA stream continuity: not tested (docs/process change)
+
+## 2026-07-13 12:44 (local)
+
+- What changed:
+  - Replaced the foreground service's combined legacy JSON/HMAC sender with a
+    single-generation External API v1 runtime using only Wi-Fi-bound TCP
+    `9810`.
+  - Added READY-session lifecycle handling, bounded reconnect backoff,
+    `server_id` enforcement, serialized/conflated reports, `TOPIC_SYSTEM`
+    subscription, and display-dimension persistence.
+  - Split cellular upstream ownership from SOCKS5, generated a random proxy
+    password per vehicle generation, kept the local listener across transient
+    API reconnects, and made the vehicle-scoped UI toggle immediate.
+  - Added live manual six-digit PIN pairing. A vehicle is saved only after a
+    complete READY result supplies a nonblank client id and 32-byte secret.
+    The QR route/button is dormant.
+  - Added a schema-gated synchronous migration that deletes legacy vehicle
+    records and old single-vehicle keys. Runtime reads still filter invalid
+    records if the commit must retry.
+  - Deleted `PiConnection`, `Protocol`, legacy tests, `Vehicle.sharedSecret`,
+    and `Vehicle.ApiMode`; production code has no path to TCP `9876`.
+  - Updated opt-in instrumentation for TCP `9810`, optional guarded `9876`
+    refusal, and optional real known-client credentials without sending
+    reports.
+- Why:
+  - Complete the approved API v1 runtime cutover with manual pairing first,
+    delete legacy records during migration, and make transport exclusivity
+    structural before the live bench.
+- Sender mapping used:
+  - legacy time/timezone -> `TimeReport` after READY and on time/timezone change
+  - legacy GPS fields -> real-fix-only `GpsReport` at approximately 1 Hz
+  - legacy battery fields -> sticky/change-driven `BatteryReport`
+  - legacy SOCKS state -> upstream-aware `ConnectivityReport`
+  - legacy hello/display metadata -> authenticated v1 handshake plus
+    `TOPIC_SYSTEM` / `SystemStatus`
+- Status: in progress (implementation complete; live Pixel/Prodigy bench
+  pending)
+- Dependency decision:
+  - Companion-only: No
+  - Head-unit prerequisites are delivered; the remaining work is coordinated
+    hardware validation and the already-documented terminal-frame diagnostic.
+- Next steps:
+  - 1) Attach the Pixel via Windows ADB, install the debug APK, and run the
+    no-flag instrumentation guard.
+  - 2) Open a Prodigy pairing window and complete manual PIN pairing, known
+    client reconnect, report/display, and bridge toggle checks.
+  - 3) Run the Prodigy section 7 continuity scenarios, including API listener
+    restart and active Android Auto media continuity, then record evidence.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.*"`
+    -> PASS
+  - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.Socks5ServerTest" --tests "org.openauto.companion.data.*" --tests "org.openauto.companion.service.*"`
+    -> PASS
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - `./gradlew :app:assembleDebugAndroidTest` -> PASS
+  - Structural scans -> no production `PiConnection`, legacy status/theme
+    builders, `ApiMode`, or `9876`; `shared_secret`/`api_mode` occur only in
+    `VehicleStorageMigration`.
+  - `/mnt/e/Android/Sdk/platform-tools/adb.exe devices` -> no attached device,
+    so the no-flag instrumentation selector was not run.
+- AA stream continuity: not tested in this implementation session; required in
+  Task 12 before completion.

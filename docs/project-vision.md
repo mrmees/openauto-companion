@@ -6,7 +6,8 @@ OpenAuto Companion is an Android app that securely connects a phone to an OpenAu
 
 ## Primary User Outcomes
 
-- Pair a vehicle quickly (manual entry or QR scan).
+- Pair a vehicle through live manual PIN entry; keep v1 QR pairing as future
+  work until its payload and UX are explicitly approved.
 - Reconnect automatically when in range of a paired vehicle SSID.
 - See clear connection status and sharing state.
 - Open head unit settings from phone with minimal friction.
@@ -26,7 +27,8 @@ OpenAuto Companion is an Android app that securely connects a phone to an OpenAu
 ## Constraints
 
 - Android app using Kotlin + Jetpack Compose.
-- Companion protocol currently targets head unit host `10.0.0.1` over companion socket `9876`.
+- Companion runtime targets head unit host `10.0.0.1` over External API v1 TCP
+  `9810`; web configuration and theme installation remain HTTP on `8080`.
 - Web settings UI is expected on `http://<host>:8080`.
 - Runtime service depends on location, Wi-Fi, and foreground-service constraints.
 - Solo-maintained project: process must remain lightweight.
@@ -120,3 +122,7 @@ Current blockers:
 - 2026-07-06: After deploying updated Pi software, Pixel app-bound probes confirmed v1 TCP `9810` and WebSocket TCP `9811` accept connections; invalid known-client TCP auth still closed before a terminal auth/error frame.
 - 2026-07-06: Updated Companion workflow memory to use Superpowers, not GSD, and marked External API v1.1 parity fields plus proxy-route teardown behavior as available on the deployed head-unit software.
 - 2026-07-07: Migrated Companion theme/wallpaper transfer from legacy `9876` chunks to the delivered web-config HTTP install endpoint.
+- 2026-07-13: Cut the foreground runtime and manual PIN pairing over to
+  Wi-Fi-bound External API v1 TCP `9810`, added one-time deletion of legacy
+  vehicle records, removed the legacy `9876` client/protocol structurally, and
+  left v1 QR pairing dormant pending a future approved payload/UX slice.

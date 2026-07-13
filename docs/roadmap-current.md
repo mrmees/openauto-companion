@@ -4,21 +4,16 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
 
 ## Now
 
-- External API v1 companion migration foundation: vendor the frozen protobuf
-  contract, add codegen, and build the codec/handshake/report/transport and
-  credential-storage layer beside the legacy `9876` path.
-  - Rationale: the head-unit External API v1 contract is merged and frozen, so
-    Companion can prepare for live client validation without destabilizing the
-    current runtime path.
-  - Dependency check: app-bound Pixel probes now reach v1 ports `9810` and
-    `9811`, and the real head-unit software now includes v1.1 fields plus
-    proxy-route teardown behavior. Full auth/READY validation still needs a
-    pairing window or stored known-client credentials. Theme transfer now uses
-    the delivered web-config HTTP upload endpoint, while non-theme legacy
-    traffic remains available during the broader runtime migration.
-  - Outcome: v1 protocol, transport, credential persistence, and v1.1
-    field-handling foundations are unit-tested while legacy service, settings,
-    SOCKS5, and theme transfer behavior remain available.
+- External API v1 companion cutover: implementation complete, live bench
+  pending.
+  - Rationale: runtime reports, manual PIN pairing, reconnect ownership, system
+    subscription, and SOCKS route advertisement now use only Wi-Fi-bound TCP
+    `9810`; the legacy `9876` client and active-model fields have been removed.
+  - Dependency check: Prodigy v1.1 and HTTP theme prerequisites are delivered.
+    A live pairing window, stored known-client reconnect, report ownership,
+    bridge toggling, and AA continuity still require the Pixel/Prodigy bench.
+  - Outcome: complete the approved bench run, capture evidence, and only then
+    move the cutover out of `Now`.
 
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
   - Rationale: this is the highest-priority product goal for the next 60 days.
