@@ -10,7 +10,7 @@ import prodigy.api.v1.Api
 class ApiReportPublisher(
     private val currentTimeMs: () -> Long,
     private val timezoneId: () -> String?
-) {
+) : ReadyReportPublisher {
     data class GpsSnapshot(
         val latitude: Double,
         val longitude: Double,
@@ -85,6 +85,13 @@ class ApiReportPublisher(
     }
 
     suspend fun runReadySession(send: suspend (Api.ApiMessage) -> Unit) {
+        runReadySession(send, afterInitialReports = {})
+    }
+
+    override suspend fun runReadySession(
+        send: suspend (Api.ApiMessage) -> Unit,
+        afterInitialReports: suspend () -> Unit
+    ) {
         sessionMutex.withLock {
             var sentGpsVersion = -1L
             var sentBatteryVersion = -1L
@@ -164,6 +171,7 @@ class ApiReportPublisher(
             }
 
             sendPending()
+            afterInitialReports()
             while (currentCoroutineContext().isActive) {
                 wake.receive()
                 sendPending()

@@ -13,7 +13,7 @@ class ApiSessionClient(
     private val transport: ApiTransport,
     private val handshake: ApiHandshake,
     private val scope: CoroutineScope
-) : AutoCloseable {
+) : ApiRuntimeClient {
     sealed class ConnectResult {
         data class Ready(
             val serverHello: Api.ServerHello,
@@ -35,14 +35,14 @@ class ApiSessionClient(
         data object ClientClosed : ReadyClose()
     }
 
-    val incoming: Channel<Api.ApiMessage> = Channel(Channel.BUFFERED)
+    override val incoming: Channel<Api.ApiMessage> = Channel(Channel.BUFFERED)
 
     private var readerJob: Job? = null
     private val readyClose = CompletableDeferred<ReadyClose>()
     private var connectStarted = false
     private var closedByClient = false
 
-    suspend fun connect(): ConnectResult {
+    override suspend fun connect(): ConnectResult {
         check(!connectStarted) { "ApiSessionClient is single-use" }
         check(!closedByClient) { "ApiSessionClient is closed" }
         connectStarted = true
@@ -80,12 +80,12 @@ class ApiSessionClient(
         }
     }
 
-    suspend fun sendReadyMessage(message: Api.ApiMessage) {
+    override suspend fun sendReadyMessage(message: Api.ApiMessage) {
         handshake.requireReadyForReports()
         transport.send(message)
     }
 
-    suspend fun awaitClosed(): ReadyClose = readyClose.await()
+    override suspend fun awaitClosed(): ReadyClose = readyClose.await()
 
     override fun close() {
         if (closedByClient) return
