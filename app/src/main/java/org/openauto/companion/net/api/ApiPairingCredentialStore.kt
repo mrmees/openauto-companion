@@ -7,28 +7,48 @@ class ApiPairingCredentialStore(
     private val loadVehicles: () -> List<Vehicle>,
     private val saveVehicles: (List<Vehicle>) -> Unit
 ) {
-    fun persistPairingResult(
-        vehicleId: String,
+    fun containsSsid(ssid: String): Boolean {
+        val normalized = ssid.trim()
+        if (normalized.isBlank()) return false
+        return loadVehicles().any { it.ssid == normalized }
+    }
+
+    fun persistNewPairing(
+        ssid: String,
+        displayName: String,
+        host: String,
         ready: ApiSessionClient.ConnectResult.Ready
-    ): Boolean {
-        val credentials = ready.pairedCredentials ?: return false
-        if (credentials.clientId.isBlank()) return false
-        if (credentials.secret.size != ApiCrypto.SECRET_SIZE_BYTES) return false
+    ): Vehicle? {
+        val normalizedSsid = ssid.trim()
+        val normalizedHost = host.trim()
+        if (normalizedSsid.isBlank() || normalizedHost.isBlank()) return null
+
+        val credentials = ready.pairedCredentials ?: return null
+        val clientId = credentials.clientId.trim()
+        if (clientId.isBlank()) return null
+        if (credentials.secret.size != ApiCrypto.SECRET_SIZE_BYTES) return null
+
+        val current = loadVehicles()
+        if (current.size >= Vehicle.MAX_VEHICLES) return null
+        if (current.any { it.ssid == normalizedSsid }) return null
 
         val serverId = if (ready.serverHello.hasServerId()) {
-            ready.serverHello.serverId.takeIf { it.isNotBlank() }
+            ready.serverHello.serverId.trim().takeIf { it.isNotBlank() }
         } else {
             null
         }
-
-        return updateMatchedVehicle(vehicleId) { vehicle ->
-            vehicle.copy(
-                apiClientId = credentials.clientId,
-                apiSecretHex = ApiCrypto.toHex(credentials.secret),
-                apiMode = Vehicle.ApiMode.EXTERNAL_API_V1,
-                serverId = serverId ?: vehicle.serverId
-            )
-        }
+        val vehicle = Vehicle(
+            ssid = normalizedSsid,
+            name = displayName.trim().ifBlank { normalizedSsid },
+            sharedSecret = "",
+            apiClientId = clientId,
+            apiSecretHex = ApiCrypto.toHex(credentials.secret),
+            apiMode = Vehicle.ApiMode.EXTERNAL_API_V1,
+            serverId = serverId,
+            settingsHost = normalizedHost
+        )
+        saveVehicles(current + vehicle)
+        return vehicle
     }
 
     fun persistSystemStatus(
