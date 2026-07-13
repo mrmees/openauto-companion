@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved for implementation planning.
+Implemented and live-validated 2026-07-13.
 
 ## Context
 

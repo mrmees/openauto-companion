@@ -653,3 +653,64 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
     so the no-flag instrumentation selector was not run.
 - AA stream continuity: not tested in this implementation session; required in
   Task 12 before completion.
+
+## 2026-07-13 15:43 (local)
+
+- What changed:
+  - Completed the live Pixel/Prodigy External API v1 cutover bench with
+    Prodigy's legacy listener disabled.
+  - Fixed live pairing on the Android Auto-owned Wi-Fi network. Android exposed
+    the network and direct `10.0.0.0/24` route but redacted its SSID from the
+    synchronous capability read, causing a false "connect to Wi-Fi" failure.
+    `WifiNetworkResolver` now keeps exact SSID matching first and falls back to
+    a direct-route match for the configured API host.
+  - Added an opt-in live resolver regression to the existing guarded API v1
+    instrumentation suite.
+- Why:
+  - Manual API pairing could reach `10.0.0.1:9810` from the app context but
+    failed before opening a session because network selection depended only on
+    SSID metadata that Android redacts for the AA-owned network.
+- Status: done; External API v1 runtime cutover and live validation complete.
+- Live results:
+  - Migration deleted the prior legacy record/keys and opened manual pairing.
+  - Manual PIN pairing reached READY and saved one API client id, 32-byte
+    secret, and server id; no legacy secret remained.
+  - Prodigy config persisted `companion.enabled: false`; startup logged the
+    disabled state, `ss` showed TCP `9810` only, and the guarded phone-side
+    `9876` refusal check passed.
+  - Saved-client reconnect passed after Prodigy restart and after Companion
+    force-stop/relaunch without another pairing window.
+  - Prodigy API IPC reported a real GPS fix, battery `62%` and charging,
+    connectivity active, and the phone SOCKS endpoint. A controlled UTC
+    mismatch was restored to `America/Chicago` by the API `TimeReport` and
+    recorded in the journal.
+  - Internet Sharing off immediately cleared the API proxy and SystemService
+    route; live verification returned disabled with listener/iptables/upstream
+    all false. Re-enable restored active with all three checks true.
+  - Companion force-stop immediately cleared connected/GPS/battery/proxy owner
+    state and the route; relaunch replayed reports and the route once. Pixel
+    logs showed no legacy fallback or `9876` attempt.
+  - The same established AA TCP `5277` socket remained present through bridge
+    toggles, Companion force-stop, and saved-client reconnect.
+- Operational note:
+  - Editing `~/.openauto/config.yaml` before `systemctl restart` is overwritten
+    by Prodigy's clean-shutdown config flush. The reliable order is stop the
+    service, edit `companion.enabled`, then start it. A timestamped pre-change
+    backup remains on the Pi.
+- Next steps:
+  - 1) Keep Prodigy `companion.enabled: false`; do not restore a legacy
+    fallback.
+  - 2) Continue the existing deterministic Pi desktop/system routing priority.
+  - 3) Treat API QR pairing as a future convenience slice; manual PIN pairing
+    remains the supported path.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - `./gradlew :app:assembleDebugAndroidTest` -> PASS
+  - No-flag `ApiV1LiveValidationTest` -> PASS (`OK`, all tests safely skipped)
+  - Guarded live `ApiV1LiveValidationTest` with API/SSID/legacy-refusal flags ->
+    PASS
+  - Pi `ss -ltnp` -> `9810` listening; no `9876`
+  - SystemService `get_proxy_status {verify:true}` -> correct active/disabled/
+    active transitions with no error
+  - AA stream continuity: PASS by stable established TCP `5277` session across
+    Companion lifecycle and bridge operations

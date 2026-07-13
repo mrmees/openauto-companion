@@ -126,3 +126,7 @@ Current blockers:
   Wi-Fi-bound External API v1 TCP `9810`, added one-time deletion of legacy
   vehicle records, removed the legacy `9876` client/protocol structurally, and
   left v1 QR pairing dormant pending a future approved payload/UX slice.
+- 2026-07-13: Completed the live Pixel/Prodigy cutover bench with the Prodigy
+  legacy listener disabled: manual pairing, saved-client reconnect, all four
+  report types, bridge teardown/replay, report-owner clearing, and Android Auto
+  session continuity passed.

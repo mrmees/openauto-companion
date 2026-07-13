@@ -30,12 +30,14 @@ tests.
 
 - Tasks 1–9: complete in focused green commits through `1bcef52`.
 - Task 10: instrumentation update complete in `202f684`; AndroidTest APK
-  compiles. The no-flag device guard run is pending because Windows ADB had no
-  attached device during implementation.
+  compiles. The no-flag device guard and guarded live suite passed on the
+  attached Pixel.
 - Task 11: JVM regression groups, mandatory unit/build gate, structural scans,
-  and the bench-ready documentation/handoff are complete in the working tree.
-- Task 12: live Pixel/Prodigy cutover bench pending with Matthew. No live
-  pairing window has been consumed and no hardware-pass claim has been made.
+  and the bench-ready documentation/handoff are complete in `94910a0`.
+- Task 12: complete. The Pixel/Prodigy bench passed with manual pairing,
+  stored-client reconnect, all report types, route toggling/owner clearing,
+  TCP `9876` refused, and the AA TCP session continuous through Companion
+  lifecycle tests.
 
 ---
 
@@ -79,7 +81,7 @@ code task before its verification is green. Do not push during execution.
 **Purpose:** Preserve the proven EPERM-only socket fallback without keeping it
 owned by the legacy client. Pairing and runtime will share this helper.
 
-- [ ] **Step 1: Write failing helper tests**
+- [x] **Step 1: Write failing helper tests**
 
 Cover:
 
@@ -89,7 +91,7 @@ Cover:
 - timeout, DNS, and unrelated socket errors do not fall back
 - the fallback predicate handles nested causes
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.NetworkSocketFactoryTest"
@@ -98,27 +100,27 @@ Cover:
 Expected: test compilation fails because `NetworkSocketFactory` does not yet
 exist.
 
-- [ ] **Step 3: Implement the transport-neutral helper**
+- [x] **Step 3: Implement the transport-neutral helper**
 
 Provide a testable function that accepts bound and unbound socket factories,
 plus an Android adapter that returns a `() -> Socket` for a nullable/matched
 `Network`. Preserve the existing fallback wording semantically but identify
 the attempted transport as API v1 where the caller logs it.
 
-- [ ] **Step 4: Move the existing EPERM tests**
+- [x] **Step 4: Move the existing EPERM tests**
 
 Remove `shouldFallbackToUnboundSocket` ownership from `PiConnection`; keep only
 legacy display/key parsing tests there until the final deletion task. Update
 the live API probe to use the shared helper where practical.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.NetworkSocketFactoryTest" --tests "org.openauto.companion.net.PiConnectionParsingTest"
 ./gradlew :app:assembleDebugAndroidTest
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/org/openauto/companion/net/NetworkSocketFactory.kt
@@ -144,7 +146,7 @@ git commit -m "refactor: share wifi-bound API socket creation"
 correct nonzero-id `TOPIC_SYSTEM` subscription while continuously draining
 server messages.
 
-- [ ] **Step 1: Write failing session lifecycle tests**
+- [x] **Step 1: Write failing session lifecycle tests**
 
 Cover:
 
@@ -156,7 +158,7 @@ Cover:
 - sends after READY remain allowed and sends before READY remain rejected
 - one `ApiSessionClient` remains single-use after close
 
-- [ ] **Step 2: Write failing request-builder tests**
+- [x] **Step 2: Write failing request-builder tests**
 
 `ApiRequests.subscribeSystem(requestId)` must:
 
@@ -164,13 +166,13 @@ Cover:
 - create `SubscribeRequest` containing only `TOPIC_SYSTEM`
 - preserve the caller's nonzero request id
 
-- [ ] **Step 3: Verify RED**
+- [x] **Step 3: Verify RED**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.ApiSessionClientTest" --tests "org.openauto.companion.net.api.ApiRequestsTest"
 ```
 
-- [ ] **Step 4: Implement lifecycle and request seams**
+- [x] **Step 4: Implement lifecycle and request seams**
 
 Keep `incoming` available for READY messages, but make reader termination
 observable without polling `Socket.isConnected`. Distinguish explicit
@@ -181,13 +183,13 @@ string matching.
 Rename `send` to `sendReadyMessage`, or retain a compatibility delegate, so
 the ready-state guard accurately covers reports and subscription requests.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.ApiSessionClientTest" --tests "org.openauto.companion.net.api.ApiRequestsTest"
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/org/openauto/companion/net/api/ApiSessionClient.kt
@@ -212,7 +214,7 @@ git commit -m "feat: expose API ready-session lifecycle"
 truth while disconnected, replay it after READY, and serialize sends without
 letting GPS callbacks starve connectivity or grow an unbounded queue.
 
-- [ ] **Step 1: Write failing report-state tests**
+- [x] **Step 1: Write failing report-state tests**
 
 Model current time provider, optional GPS snapshot, battery snapshot, and
 connectivity snapshot. Cover:
@@ -227,19 +229,19 @@ connectivity snapshot. Cover:
 - writer failure closes/cancels the ready publisher rather than continuing a
   half-alive queue
 
-- [ ] **Step 2: Extend builder validation tests**
+- [x] **Step 2: Extend builder validation tests**
 
 Cover finite latitude/longitude/speed/bearing/accuracy/altitude, nonnegative
 age, bearing range `[0, 360)`, battery `0..100`, inactive SOCKS port `0`, and
 optional password/altitude presence. Do not change the proto.
 
-- [ ] **Step 3: Verify RED**
+- [x] **Step 3: Verify RED**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.ApiReportPublisherTest" --tests "org.openauto.companion.net.api.ApiReportsTest"
 ```
 
-- [ ] **Step 4: Implement publisher and validation**
+- [x] **Step 4: Implement publisher and validation**
 
 Use per-report conflation or an equivalent bounded design so one report type
 cannot overwrite another. Accept a suspending send function for tests and for
@@ -247,13 +249,13 @@ cannot overwrite another. Accept a suspending send function for tests and for
 the injected current-time/timezone providers at READY rather than replaying a
 stale wall-clock timestamp.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.ApiReportPublisherTest" --tests "org.openauto.companion.net.api.ApiReportsTest"
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/org/openauto/companion/net/api/ApiReportPublisher.kt
@@ -278,7 +280,7 @@ git commit -m "feat: add reconnect-safe API report publisher"
 network with SOCKS egress, release callbacks correctly, and implement the API's
 password-only proxy convention.
 
-- [ ] **Step 1: Write failing upstream-state tests**
+- [x] **Step 1: Write failing upstream-state tests**
 
 Extract a pure state seam and cover:
 
@@ -287,7 +289,7 @@ Extract a pure state seam and cover:
 - losing a non-selected network does not clear the selected upstream
 - stop/reset clears state idempotently
 
-- [ ] **Step 2: Write failing SOCKS authentication tests**
+- [x] **Step 2: Write failing SOCKS authentication tests**
 
 Extend loopback or parser-level coverage to prove:
 
@@ -298,13 +300,13 @@ Extend loopback or parser-level coverage to prove:
 - `stop()` is idempotent
 - outbound sockets ask the injected network provider for the current upstream
 
-- [ ] **Step 3: Verify RED**
+- [x] **Step 3: Verify RED**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.CellularUpstreamStateTest" --tests "org.openauto.companion.net.Socks5ServerTest"
 ```
 
-- [ ] **Step 4: Implement monitor and SOCKS changes**
+- [x] **Step 4: Implement monitor and SOCKS changes**
 
 `CellularUpstreamMonitor` owns and unregisters its Android network callback.
 It exposes current usability, the selected `Network`, and a change callback or
@@ -315,14 +317,14 @@ password after parsing RFC 1929 credentials.
 Keep private/link-local destination blocking, connection limits, and relay
 behavior unchanged.
 
-- [ ] **Step 5: Verify GREEN and compile Android code**
+- [x] **Step 5: Verify GREEN and compile Android code**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.CellularUpstreamStateTest" --tests "org.openauto.companion.net.Socks5ServerTest"
 ./gradlew :app:assembleDebug
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/org/openauto/companion/net/CellularUpstreamMonitor.kt
@@ -347,7 +349,7 @@ git commit -m "feat: track cellular upstream for SOCKS reports"
 server-identity checks, system subscription handling, and retry classification
 outside the Android service.
 
-- [ ] **Step 1: Write failing runtime-loop tests with virtual time**
+- [x] **Step 1: Write failing runtime-loop tests with virtual time**
 
 Use fake session/client factories and an injected backoff policy. Cover:
 
@@ -365,13 +367,13 @@ Use fake session/client factories and an injected backoff policy. Cover:
 - session close stops its publisher before reconnect begins
 - cancellation/vehicle-generation change closes the active client and exits
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.ApiRuntimeLoopTest"
 ```
 
-- [ ] **Step 3: Implement runtime interfaces and loop**
+- [x] **Step 3: Implement runtime interfaces and loop**
 
 Define narrow injected seams for:
 
@@ -385,13 +387,13 @@ Reuse/refactor `ApiPairingCredentialStore.persistSystemStatus`; do not add
 Android dependencies to the runtime loop. Ensure all client and writer cleanup
 occurs in `finally` paths.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.ApiRuntimeLoopTest" --tests "org.openauto.companion.net.api.ApiPairingCredentialStoreTest" --tests "org.openauto.companion.net.api.ApiSessionClientTest"
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/src/main/java/org/openauto/companion/net/api/ApiRuntimeLoop.kt
@@ -420,7 +422,7 @@ git commit -m "feat: add External API runtime reconnect loop"
 preserving theme HTTP, WebView, audio keep-alive, and foreground notification
 behavior.
 
-- [ ] **Step 1: Write failing pure service-helper tests**
+- [x] **Step 1: Write failing pure service-helper tests**
 
 `LocationReportMapperTest` covers:
 
@@ -438,20 +440,20 @@ behavior.
 least 128 bits of randomness represented without leaking API credentials. Use
 an injected byte source to make tests deterministic.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.service.LocationReportMapperTest" --tests "org.openauto.companion.service.ProxyPasswordTest"
 ```
 
-- [ ] **Step 3: Change WifiMonitor service inputs**
+- [x] **Step 3: Change WifiMonitor service inputs**
 
 Pass vehicle id/name/SSID, API client id, API secret hex, optional server id,
 head-unit host, SOCKS preference, and audio preference. Refuse to start the
 service for a vehicle without valid v1 credentials. Remove runtime dependence
 on the legacy shared secret and API-mode selection.
 
-- [ ] **Step 4: Replace the service connection/push loop**
+- [x] **Step 4: Replace the service connection/push loop**
 
 In `CompanionService`:
 
@@ -470,7 +472,7 @@ In `CompanionService`:
 - leave the theme executor and HTTP transfer independent of API readiness
 - retain audio keep-alive behavior
 
-- [ ] **Step 5: Make bridge toggles immediate**
+- [x] **Step 5: Make bridge toggles immediate**
 
 Add a vehicle-scoped service command/static seam. The status UI callback must
 persist the setting and notify the running service. Enable starts SOCKS and
@@ -480,14 +482,14 @@ when READY. Ignore commands for a stale/different vehicle generation.
 Expose UI state so bridge Active means API READY, usable cellular upstream,
 and local SOCKS listener—not just the saved preference.
 
-- [ ] **Step 6: Compile and run focused tests**
+- [x] **Step 6: Compile and run focused tests**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.service.*" --tests "org.openauto.companion.net.api.ApiRuntimeLoopTest" --tests "org.openauto.companion.net.api.ApiReportPublisherTest" --tests "org.openauto.companion.net.Socks5ServerTest"
 ./gradlew :app:assembleDebug
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add app/src/main/java/org/openauto/companion/service/CompanionService.kt
@@ -517,7 +519,7 @@ git commit -m "feat: cut companion runtime over to API v1"
 Keep Android network discovery in an adapter and pairing/persistence decisions
 in JVM-testable code.
 
-- [ ] **Step 1: Write failing coordinator tests**
+- [x] **Step 1: Write failing coordinator tests**
 
 Define a pairing draft containing SSID, display name, and host. Use fake
 network/session factories. Cover:
@@ -533,13 +535,13 @@ network/session factories. Cover:
 - the transport request is TCP host/default `10.0.0.1`, port `9810`, and uses
   the resolved Wi-Fi socket factory
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.ApiPairingCoordinatorTest" --tests "org.openauto.companion.net.api.ApiPairingCredentialStoreTest"
 ```
 
-- [ ] **Step 3: Implement resolver and coordinator**
+- [x] **Step 3: Implement resolver and coordinator**
 
 `WifiNetworkResolver` inspects app-visible Wi-Fi networks, matches the entered
 SSID, and returns the Android `Network`; it never process-binds. The
@@ -551,14 +553,14 @@ Refactor `ApiPairingCredentialStore` as needed so pairing can create a new
 vehicle rather than requiring a legacy draft vehicle to already exist. Keep
 system-dimension persistence available for runtime.
 
-- [ ] **Step 4: Verify GREEN and compile Android adapter**
+- [x] **Step 4: Verify GREEN and compile Android adapter**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.ApiPairingCoordinatorTest" --tests "org.openauto.companion.net.api.ApiPairingCredentialStoreTest"
 ./gradlew :app:assembleDebug
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/src/main/java/org/openauto/companion/net/WifiNetworkResolver.kt
@@ -585,7 +587,7 @@ git commit -m "feat: add manual External API pairing backend"
 **Purpose:** Delete saved legacy vehicles exactly once and make live manual API
 pairing the only active way to create a vehicle.
 
-- [ ] **Step 1: Write failing pure migration tests**
+- [x] **Step 1: Write failing pure migration tests**
 
 Cover JSON/schema behavior:
 
@@ -600,20 +602,20 @@ Cover JSON/schema behavior:
 - when a preference commit is retried, runtime filtering still exposes only
   valid v1 vehicles
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.data.VehicleStorageMigrationTest" --tests "org.openauto.companion.data.VehicleSerializationTest"
 ```
 
-- [ ] **Step 3: Implement schema-gated purge**
+- [x] **Step 3: Implement schema-gated purge**
 
 Add a versioned migration in `CompanionPrefs`. Rewrite survivors, remove old
 single-vehicle keys, and set the marker in one synchronous editor commit.
 Make all getters/adders reject vehicles without valid v1 credentials even if
 the cleanup write failed. Do not log deleted secrets.
 
-- [ ] **Step 4: Wire pairing UI asynchronously**
+- [x] **Step 4: Wire pairing UI asynchronously**
 
 Replace local `deriveSecret(pin)` vehicle creation with
 `ApiPairingCoordinator`. Add Idle/Pairing/Failed UI state, disable duplicate
@@ -624,14 +626,14 @@ Remove the active QR route/button from `PairingScreen` and `MainActivity`.
 `QrScanScreen`, parser, and CameraX/ML Kit dependencies may remain dormant for
 future v1 QR work; they must have no active persistence callback.
 
-- [ ] **Step 5: Verify GREEN and UI compile**
+- [x] **Step 5: Verify GREEN and UI compile**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.data.VehicleStorageMigrationTest" --tests "org.openauto.companion.data.VehicleSerializationTest" --tests "org.openauto.companion.net.api.ApiPairingCoordinatorTest"
 ./gradlew :app:assembleDebug
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add app/src/main/java/org/openauto/companion/data/VehicleStorageMigration.kt
@@ -664,7 +666,7 @@ git commit -m "feat: migrate saved vehicles to live API pairing"
 **Purpose:** Make exclusivity structural and remove transitional legacy data
 fields once v1 runtime and pairing are active.
 
-- [ ] **Step 1: Update model tests first**
+- [x] **Step 1: Update model tests first**
 
 Change `VehicleSerializationTest` so every vehicle has required API client id
 and 32-byte secret hex. Prove JSON round-trip for server id, endpoint,
@@ -673,13 +675,13 @@ preferences, and display size without `shared_secret` or `api_mode`.
 Keep `VehicleStorageMigration` responsible for parsing pre-cutover raw JSON;
 the final `Vehicle.fromJson` handles only valid post-cutover records.
 
-- [ ] **Step 2: Verify RED after removing legacy model expectations**
+- [x] **Step 2: Verify RED after removing legacy model expectations**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.data.VehicleSerializationTest"
 ```
 
-- [ ] **Step 3: Remove fields and protocol files**
+- [x] **Step 3: Remove fields and protocol files**
 
 Remove:
 
@@ -694,7 +696,7 @@ Update the settings URL comment/example so production Java/Kotlin contains no
 misleading `9876` reference. Do not delete `ThemeTransfer` or change its HTTP
 behavior.
 
-- [ ] **Step 4: Run structural scans**
+- [x] **Step 4: Run structural scans**
 
 ```bash
 rg -n "PiConnection|Protocol\.buildStatus|buildThemeMessage|buildThemeDataChunk|ApiMode|9876" app/src/main/java
@@ -718,13 +720,13 @@ rg -n "ApiWebSocketTransport" app/src/main/java/org/openauto/companion/service a
 Expected: no runtime selection/reference. The standalone tested WebSocket
 foundation file may remain.
 
-- [ ] **Step 5: Verify GREEN**
+- [x] **Step 5: Verify GREEN**
 
 ```bash
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A app/src/main app/src/test
@@ -746,12 +748,12 @@ shared network-bound socket seam without consuming a real pairing window or
 creating an orphaned head-unit credential. Production manual pairing and
 reports are validated in Task 12.
 
-- [ ] **Step 1: Preserve opt-in safety**
+- [x] **Step 1: Preserve opt-in safety**
 
 All live tests continue to skip unless `-e live_api_v1 true` is supplied. PIN,
 client id, and secret are instrumentation arguments and are never printed.
 
-- [ ] **Step 2: Update cutover transport diagnostics**
+- [x] **Step 2: Update cutover transport diagnostics**
 
 Support:
 
@@ -769,18 +771,18 @@ companion reports from instrumentation because a second diagnostic session
 could take report ownership away from the production service and disturb the
 SOCKS route under test.
 
-- [ ] **Step 3: Compile instrumentation APK**
+- [x] **Step 3: Compile instrumentation APK**
 
 ```bash
 ./gradlew :app:assembleDebugAndroidTest
 ```
 
-- [ ] **Step 4: Run the opt-in guard without hardware mutation**
+- [x] **Step 4: Run the opt-in guard without hardware mutation**
 
 Run the existing instrumentation selector without `-e live_api_v1 true` and
 confirm the live cases skip/return OK.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/src/androidTest/java/org/openauto/companion/net/api
@@ -803,14 +805,14 @@ git commit -m "test: extend live API cutover validation"
 **Purpose:** Record the cutover accurately without claiming the hardware bench
 has passed before Matthew runs it.
 
-- [ ] **Step 1: Run focused regression groups**
+- [x] **Step 1: Run focused regression groups**
 
 ```bash
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.*"
 ./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.Socks5ServerTest" --tests "org.openauto.companion.data.*" --tests "org.openauto.companion.service.*"
 ```
 
-- [ ] **Step 2: Run the mandatory repository gate**
+- [x] **Step 2: Run the mandatory repository gate**
 
 ```bash
 ./gradlew :app:testDebugUnitTest :app:assembleDebug
@@ -818,7 +820,7 @@ has passed before Matthew runs it.
 
 Expected: PASS.
 
-- [ ] **Step 3: Run static checks**
+- [x] **Step 3: Run static checks**
 
 ```bash
 git diff --check
@@ -829,7 +831,7 @@ rg -n "shared_secret|api_mode" app/src/main/java
 Expected: whitespace check passes; the connection/runtime legacy scan is
 empty; old JSON key strings are confined to the one-time storage migration.
 
-- [ ] **Step 4: Update project memory**
+- [x] **Step 4: Update project memory**
 
 - Change the vision constraint from legacy `9876` to External API v1 TCP
   `9810` plus HTTP web config `8080`.
@@ -840,7 +842,7 @@ empty; old JSON key strings are confined to the one-time storage migration.
 - Mark the old service-integration/retirement plan phases superseded by the
   approved Superpowers spec/plan while preserving foundation history.
 
-- [ ] **Step 5: Append the implementation handoff**
+- [x] **Step 5: Append the implementation handoff**
 
 Include:
 
@@ -853,7 +855,7 @@ Include:
 - status `in progress` until live bench passes
 - next steps: install, pair, run Prodigy §7, capture AA continuity
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add docs/project-vision.md
@@ -884,7 +886,7 @@ git commit -m "docs: prepare API v1 cutover bench handoff"
 - Matthew can open the External API pairing window and observe Pi widgets,
   SystemService state, and journal.
 
-- [ ] **Step 1: Install Companion**
+- [x] **Step 1: Install Companion**
 
 ```bash
 /mnt/e/Android/Sdk/platform-tools/adb.exe -s 39260DLJH000LX install -r app/build/outputs/apk/debug/app-debug.apk
@@ -892,26 +894,26 @@ git commit -m "docs: prepare API v1 cutover bench handoff"
 
 Expected: `Success`.
 
-- [ ] **Step 2: Disable and prove legacy listener absence**
+- [x] **Step 2: Disable and prove legacy listener absence**
 
 On the Pi, set `companion.enabled: false`, restart Prodigy, confirm
 `ss -ltnp` has no `9876` listener, and confirm a phone-side connection attempt
 is refused. Keep API TCP `9810` available.
 
-- [ ] **Step 3: Validate migration and manual pairing**
+- [x] **Step 3: Validate migration and manual pairing**
 
 Launch Companion, confirm legacy vehicles were deleted, start Prodigy API
 pairing, enter the displayed PIN, and confirm known-client reconnect succeeds
 after the short pairing session closes.
 
-- [ ] **Step 4: Validate every report**
+- [x] **Step 4: Validate every report**
 
 - GPS visible with bearing/accuracy and approximately 30-second staleness
 - battery percentage and charging state track the Pixel
 - time report produces the controlled clock-step/timezone journal evidence
 - connectivity initially reflects real upstream/listener state
 
-- [ ] **Step 5: Validate bridge toggle and reconnect**
+- [x] **Step 5: Validate bridge toggle and reconnect**
 
 - enable bridge: listener active, Prodigy proxy row On, SystemService route up
 - disable bridge: route down immediately without waiting for API disconnect
@@ -919,13 +921,13 @@ after the short pairing session closes.
 - reconnect: one v1 client, one listener, route/reports replay once
 - confirm no simultaneous legacy/v1 publisher and no duplicate SOCKS bind
 
-- [ ] **Step 6: Validate logs and Android Auto continuity**
+- [x] **Step 6: Validate logs and Android Auto continuity**
 
 Companion logs must show `api-v1-tcp` only, zero `9876` attempts, zero legacy
 fallback, and no credentials. Keep AA media active through toggle/disconnect/
 reconnect and record whether playback is uninterrupted.
 
-- [ ] **Step 7: Record final results**
+- [x] **Step 7: Record final results**
 
 If all rows pass:
 
@@ -938,6 +940,20 @@ If all rows pass:
 If a row fails, leave status `in progress`, record the exact observable and
 logs, and use the repository's Superpowers debugging workflow. Do not restore
 legacy fallback as a workaround.
+
+**Live result (2026-07-13): PASS.** A live-only resolver regression found that
+Android redacts the SSID on the Android Auto-owned network from synchronous
+capability reads. Pairing now prefers an exact SSID match and safely falls back
+to the Wi-Fi network with a direct route to the configured Prodigy host. The
+new live resolver test failed before that fix and passed afterward. With
+Prodigy `companion.enabled: false`, Pi `ss` showed only `9810`, and the guarded
+Pixel suite passed API reachability, resolver selection, `9876` refusal, and
+auth response checks. Manual PIN pairing and two saved-client reconnect paths
+passed. IPC showed live GPS, battery/charging, and connectivity reports; a
+controlled timezone mismatch was restored by `TimeReport`. Bridge off/on and
+force-stop/relaunch produced immediate, verified SystemService route teardown
+and replay. The same established AA `5277` socket remained present throughout
+the Companion lifecycle checks.
 
 ---
 

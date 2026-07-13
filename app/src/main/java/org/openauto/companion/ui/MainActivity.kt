@@ -31,6 +31,7 @@ import org.openauto.companion.net.WifiNetworkResolver
 import org.openauto.companion.net.api.ApiPairingCoordinator
 import org.openauto.companion.net.api.ApiPairingCredentialStore
 import org.openauto.companion.net.api.ApiPairingDraft
+import org.openauto.companion.net.api.ApiTcpTransport
 import org.openauto.companion.service.CompanionService
 import org.openauto.companion.service.VehicleIdentity
 
@@ -132,7 +133,10 @@ class MainActivity : ComponentActivity() {
                                     val coordinator = ApiPairingCoordinator(
                                         credentialStore = credentialStore,
                                         resolveSocketFactory = { targetSsid ->
-                                            networkResolver.resolve(targetSsid)?.let { network ->
+                                            networkResolver.resolve(
+                                                targetSsid,
+                                                ApiTcpTransport.DEFAULT_HOST
+                                            )?.let { network ->
                                                 NetworkSocketFactory.forNetwork(
                                                     network,
                                                     onFallback = {

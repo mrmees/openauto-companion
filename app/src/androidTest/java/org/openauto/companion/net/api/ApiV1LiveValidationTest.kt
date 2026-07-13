@@ -24,9 +24,24 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.openauto.companion.net.NetworkSocketFactory
+import org.openauto.companion.net.WifiNetworkResolver
 
 @RunWith(AndroidJUnit4::class)
 class ApiV1LiveValidationTest {
+    @Test
+    fun wifiResolverFindsConnectedApiNetwork() {
+        assumeLiveApiV1Enabled()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val arguments = InstrumentationRegistry.getArguments()
+        val ssid = arguments.getString("api_ssid")?.trim().orEmpty()
+        assumeTrue("Wi-Fi resolver validation requires -e api_ssid <ssid>", ssid.isNotBlank())
+
+        assertNotNull(
+            "Companion could not resolve the connected API Wi-Fi network",
+            WifiNetworkResolver(context).resolve(ssid, HOST)
+        )
+    }
+
     @Test
     fun tcpPortAcceptsConnectionsOverWifiNetwork() {
         assumeLiveApiV1Enabled()

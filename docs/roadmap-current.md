@@ -2,18 +2,17 @@
 
 Governance: capture new ideas in `docs/wishlist.md`; only promoted items should appear in this roadmap.
 
-## Now
+## Recently Completed
 
-- External API v1 companion cutover: implementation complete, live bench
-  pending.
-  - Rationale: runtime reports, manual PIN pairing, reconnect ownership, system
-    subscription, and SOCKS route advertisement now use only Wi-Fi-bound TCP
-    `9810`; the legacy `9876` client and active-model fields have been removed.
-  - Dependency check: Prodigy v1.1 and HTTP theme prerequisites are delivered.
-    A live pairing window, stored known-client reconnect, report ownership,
-    bridge toggling, and AA continuity still require the Pixel/Prodigy bench.
-  - Outcome: complete the approved bench run, capture evidence, and only then
-    move the cutover out of `Now`.
+- External API v1 companion cutover — completed and live-validated 2026-07-13.
+  - Manual PIN pairing, stored-client reconnect, time/GPS/battery/connectivity
+    reports, immediate bridge toggling, owner clearing, and replay all passed
+    on the Pixel/Prodigy bench over Wi-Fi-bound TCP `9810`.
+  - Prodigy ran with `companion.enabled: false`; TCP `9876` was absent and the
+    guarded phone-side refusal probe passed. Android Auto's established `5277`
+    session remained up through Companion toggle, force-stop, and reconnect.
+
+## Now
 
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
   - Rationale: this is the highest-priority product goal for the next 60 days.
