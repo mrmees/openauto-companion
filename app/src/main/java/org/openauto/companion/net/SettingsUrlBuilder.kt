@@ -7,8 +7,7 @@ object SettingsUrlBuilder {
     fun build(host: String?, port: Int?): String {
         val normalizedHost = host?.trim().orEmpty()
         if (normalizedHost.isBlank()) return FALLBACK_URL
-        // Settings UI is served on the web-config socket, not the companion socket.
-        // Ignore stored companion pairing port values (e.g. 9876).
+        // Settings UI always uses the web-config port; pairing endpoint metadata is unrelated.
         @Suppress("UNUSED_VARIABLE")
         val ignoredPort = port
         return "http://$normalizedHost:$SETTINGS_PORT"

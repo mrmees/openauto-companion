@@ -30,7 +30,7 @@ class SettingsUrlBuilderTest {
 
     @Test
     fun build_mapsCompanionPortToSettingsSocket() {
-        val url = SettingsUrlBuilder.build(host = "10.0.0.1", port = 9876)
+        val url = SettingsUrlBuilder.build(host = "10.0.0.1", port = 1234)
         assertEquals("http://10.0.0.1:8080", url)
     }
 }

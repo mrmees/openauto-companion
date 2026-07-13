@@ -40,10 +40,8 @@ class ApiPairingCredentialStore(
         val vehicle = Vehicle(
             ssid = normalizedSsid,
             name = displayName.trim().ifBlank { normalizedSsid },
-            sharedSecret = "",
             apiClientId = clientId,
             apiSecretHex = ApiCrypto.toHex(credentials.secret),
-            apiMode = Vehicle.ApiMode.EXTERNAL_API_V1,
             serverId = serverId,
             settingsHost = normalizedHost
         )

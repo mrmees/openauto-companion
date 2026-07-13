@@ -14,7 +14,8 @@ class CompanionPrefs(context: Context) {
 
     var vehicles: List<Vehicle>
         get() = VehicleStorageMigration.activeVehicles(
-            prefs.getString(KEY_VEHICLES, "").orEmpty()
+            rawVehiclesJson = prefs.getString(KEY_VEHICLES, "").orEmpty(),
+            storedVersion = prefs.getInt(KEY_STORAGE_VERSION, 0)
         )
         set(value) {
             val valid = value.filter(VehicleStorageMigration::isValidV1)

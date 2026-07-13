@@ -2,16 +2,15 @@ package org.openauto.companion.data
 
 import org.json.JSONArray
 import org.json.JSONObject
+import org.openauto.companion.net.api.ApiCrypto
 import java.util.UUID
 
 data class Vehicle(
     val id: String = UUID.randomUUID().toString().take(8),
     val ssid: String,
     val name: String = ssid,
-    val sharedSecret: String,
-    val apiClientId: String? = null,
-    val apiSecretHex: String? = null,
-    val apiMode: ApiMode = ApiMode.LEGACY,
+    val apiClientId: String,
+    val apiSecretHex: String,
     val serverId: String? = null,
     val socks5Enabled: Boolean = true,
     val audioKeepAlive: Boolean = false,
@@ -20,13 +19,11 @@ data class Vehicle(
     val displayWidth: Int? = null,
     val displayHeight: Int? = null
 ) {
-    enum class ApiMode(val jsonValue: String) {
-        LEGACY("legacy"),
-        EXTERNAL_API_V1("external_api_v1");
-
-        companion object {
-            fun fromJson(value: String?): ApiMode =
-                entries.firstOrNull { it.jsonValue == value } ?: LEGACY
+    init {
+        require(ssid.isNotBlank()) { "Vehicle SSID is required" }
+        require(apiClientId.isNotBlank()) { "API client id is required" }
+        require(ApiCrypto.decodeSecretHex(apiSecretHex) != null) {
+            "API secret must be 32-byte hexadecimal"
         }
     }
 
@@ -34,11 +31,9 @@ data class Vehicle(
         put("id", id)
         put("ssid", ssid)
         put("name", name)
-        put("shared_secret", sharedSecret)
-        if (!apiClientId.isNullOrBlank()) put("api_client_id", apiClientId)
-        if (!apiSecretHex.isNullOrBlank()) put("api_secret_hex", apiSecretHex)
+        put("api_client_id", apiClientId)
+        put("api_secret_hex", apiSecretHex)
         if (!serverId.isNullOrBlank()) put("server_id", serverId)
-        if (apiMode != ApiMode.LEGACY) put("api_mode", apiMode.jsonValue)
         put("socks5_enabled", socks5Enabled)
         put("audio_keep_alive", audioKeepAlive)
         if (!settingsHost.isNullOrBlank()) put("settings_host", settingsHost)
@@ -51,31 +46,35 @@ data class Vehicle(
         private fun stableIdForSsid(ssid: String): String =
             UUID.nameUUIDFromBytes(ssid.toByteArray(Charsets.UTF_8)).toString().take(8)
 
-        fun fromJson(json: JSONObject): Vehicle = Vehicle(
-            id = json.optString("id", "").ifBlank { stableIdForSsid(json.getString("ssid")) },
-            ssid = json.getString("ssid"),
-            name = json.optString("name", json.getString("ssid")),
-            sharedSecret = json.getString("shared_secret"),
-            apiClientId = json.optString("api_client_id", "").ifBlank { null },
-            apiSecretHex = json.optString("api_secret_hex", "").ifBlank { null },
-            apiMode = ApiMode.fromJson(json.optString("api_mode", ApiMode.LEGACY.jsonValue)),
-            serverId = json.optString("server_id", "").ifBlank { null },
-            socks5Enabled = json.optBoolean("socks5_enabled", true),
-            audioKeepAlive = json.optBoolean("audio_keep_alive", false),
-            settingsHost = json.optString("settings_host", "").ifBlank { null },
-            settingsPort = if (json.has("settings_port")) json.optInt("settings_port") else null,
-            displayWidth = if (json.has("display_width")) json.optInt("display_width") else null,
-            displayHeight = if (json.has("display_height")) json.optInt("display_height") else null
-        )
+        fun fromJson(json: JSONObject): Vehicle {
+            val ssid = json.getString("ssid").trim()
+            return Vehicle(
+                id = json.optString("id", "").ifBlank { stableIdForSsid(ssid) },
+                ssid = ssid,
+                name = json.optString("name", ssid).ifBlank { ssid },
+                apiClientId = json.getString("api_client_id").trim(),
+                apiSecretHex = json.getString("api_secret_hex").trim(),
+                serverId = json.optString("server_id", "").trim().ifBlank { null },
+                socks5Enabled = json.optBoolean("socks5_enabled", true),
+                audioKeepAlive = json.optBoolean("audio_keep_alive", false),
+                settingsHost = json.optString("settings_host", "").trim().ifBlank { null },
+                settingsPort = json.optionalInt("settings_port"),
+                displayWidth = json.optionalInt("display_width"),
+                displayHeight = json.optionalInt("display_height")
+            )
+        }
 
         fun listToJson(vehicles: List<Vehicle>): String =
             JSONArray(vehicles.map { it.toJson() }).toString()
 
         fun listFromJson(json: String): List<Vehicle> {
             if (json.isBlank()) return emptyList()
-            val arr = JSONArray(json)
-            return (0 until arr.length()).map { fromJson(arr.getJSONObject(it)) }
+            val array = JSONArray(json)
+            return (0 until array.length()).map { fromJson(array.getJSONObject(it)) }
         }
+
+        private fun JSONObject.optionalInt(key: String): Int? =
+            if (has(key) && !isNull(key)) getInt(key) else null
 
         const val MAX_VEHICLES = 20
     }

@@ -1,167 +1,123 @@
 package org.openauto.companion.data
 
-import org.junit.Assert.*
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class VehicleSerializationTest {
     @Test
-    fun roundTrip_singleVehicle() {
-        val v = Vehicle(id = "abc123", ssid = "MiataAA-A3F2", name = "Miata",
-            sharedSecret = "deadbeef", socks5Enabled = true,
-            settingsHost = "10.0.0.1", settingsPort = 8080)
-        val json = Vehicle.listToJson(listOf(v))
-        val result = Vehicle.listFromJson(json)
-        assertEquals(1, result.size)
-        assertEquals("abc123", result[0].id)
-        assertEquals("MiataAA-A3F2", result[0].ssid)
-        assertEquals("Miata", result[0].name)
-        assertEquals("deadbeef", result[0].sharedSecret)
-        assertTrue(result[0].socks5Enabled)
-        assertEquals("10.0.0.1", result[0].settingsHost)
-        assertEquals(8080, result[0].settingsPort)
+    fun roundTrip_preservesCompleteApiVehicleWithoutLegacyFields() {
+        val vehicle = vehicle(
+            id = "abc123",
+            ssid = "MiataAA-A3F2",
+            name = "Miata",
+            serverId = "server-1",
+            socks5Enabled = false,
+            audioKeepAlive = true,
+            settingsHost = "10.0.0.42",
+            settingsPort = 8080,
+            displayWidth = 1280,
+            displayHeight = 720
+        )
+
+        val json = vehicle.toJson()
+        val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(vehicle))).single()
+
+        assertFalse(json.has("shared_secret"))
+        assertFalse(json.has("api_mode"))
+        assertEquals(vehicle, result)
     }
 
     @Test
     fun roundTrip_multipleVehicles() {
         val vehicles = listOf(
-            Vehicle(id = "a1", ssid = "Car1", sharedSecret = "s1"),
-            Vehicle(id = "b2", ssid = "Car2", name = "Truck", sharedSecret = "s2", socks5Enabled = false)
+            vehicle(id = "a1", ssid = "Car1"),
+            vehicle(id = "b2", ssid = "Car2", name = "Truck", socks5Enabled = false)
         )
+
         val result = Vehicle.listFromJson(Vehicle.listToJson(vehicles))
-        assertEquals(2, result.size)
-        assertEquals("Car2", result[1].ssid)
-        assertEquals("Truck", result[1].name)
-        assertFalse(result[1].socks5Enabled)
+
+        assertEquals(vehicles, result)
     }
 
     @Test
-    fun fromJson_defaultsNameToSsid() {
-        val json = org.json.JSONObject().apply {
-            put("ssid", "TestAP")
-            put("shared_secret", "abc")
-        }
-        val v = Vehicle.fromJson(json)
-        assertEquals("TestAP", v.name)
-        assertNull(v.settingsHost)
-        assertNull(v.settingsPort)
+    fun fromJson_defaultsOptionalFieldsAndName() {
+        val json = requiredJson(ssid = "TestAP")
+
+        val vehicle = Vehicle.fromJson(json)
+
+        assertEquals("TestAP", vehicle.name)
+        assertTrue(vehicle.socks5Enabled)
+        assertFalse(vehicle.audioKeepAlive)
+        assertNull(vehicle.serverId)
+        assertNull(vehicle.settingsHost)
+        assertNull(vehicle.settingsPort)
+        assertNull(vehicle.displayWidth)
+        assertNull(vehicle.displayHeight)
     }
 
     @Test
     fun fromJson_generatesStableIdFromSsidWhenMissing() {
-        val json = org.json.JSONObject().apply {
-            put("ssid", "BridgeAP")
-            put("shared_secret", "abc")
-        }
+        val json = requiredJson(ssid = "BridgeAP")
+
         val first = Vehicle.fromJson(json).id
         val second = Vehicle.fromJson(json).id
-        assertEquals("Stable id should be deterministic by SSID", first, second)
+
+        assertEquals(first, second)
         assertFalse(first.isBlank())
     }
 
     @Test
-    fun roundTrip_endpointFieldsRemainNullWhenUnset() {
-        val v = Vehicle(id = "null1", ssid = "NullAP", sharedSecret = "s")
-        val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v)))
-        assertNull(result[0].settingsHost)
-        assertNull(result[0].settingsPort)
-    }
+    fun fromJson_rejectsMissingOrInvalidRequiredApiCredentials() {
+        val missingClient = requiredJson().apply { remove("api_client_id") }
+        val blankClient = requiredJson().put("api_client_id", " ")
+        val missingSecret = requiredJson().apply { remove("api_secret_hex") }
+        val malformedSecret = requiredJson().put("api_secret_hex", "zz".repeat(32))
+        val shortSecret = requiredJson().put("api_secret_hex", "aa".repeat(31))
 
-    @Test
-    fun roundTrip_displayResolution() {
-        val v = Vehicle(id = "disp1", ssid = "TestAP", sharedSecret = "s",
-            displayWidth = 1024, displayHeight = 600)
-        val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v)))
-        assertEquals(1024, result[0].displayWidth)
-        assertEquals(600, result[0].displayHeight)
-    }
-
-    @Test
-    fun roundTrip_apiV1Credentials() {
-        val secretHex = "aa".repeat(32)
-        val v = Vehicle(
-            id = "api1",
-            ssid = "ApiAP",
-            sharedSecret = "",
-            apiClientId = "client-123",
-            apiSecretHex = secretHex,
-            apiMode = Vehicle.ApiMode.EXTERNAL_API_V1
-        )
-
-        val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v))).single()
-
-        assertEquals("", result.sharedSecret)
-        assertEquals("client-123", result.apiClientId)
-        assertEquals(secretHex, result.apiSecretHex)
-        assertEquals(Vehicle.ApiMode.EXTERNAL_API_V1, result.apiMode)
-    }
-
-    @Test
-    fun fromJson_apiV1CredentialsDefaultToLegacyWhenMissing() {
-        val json = org.json.JSONObject().apply {
-            put("ssid", "OldHU")
-            put("shared_secret", "abc")
-        }
-
-        val v = Vehicle.fromJson(json)
-
-        assertNull(v.apiClientId)
-        assertNull(v.apiSecretHex)
-        assertEquals(Vehicle.ApiMode.LEGACY, v.apiMode)
-    }
-
-    @Test
-    fun fromJson_unknownApiModeDefaultsToLegacy() {
-        val json = org.json.JSONObject().apply {
-            put("ssid", "OldHU")
-            put("shared_secret", "abc")
-            put("api_mode", "future-mode")
-        }
-
-        val v = Vehicle.fromJson(json)
-
-        assertEquals(Vehicle.ApiMode.LEGACY, v.apiMode)
-    }
-
-    @Test
-    fun fromJson_displayResolutionDefaultsWhenMissing() {
-        val json = org.json.JSONObject().apply {
-            put("ssid", "OldHU")
-            put("shared_secret", "abc")
-        }
-        val v = Vehicle.fromJson(json)
-        assertNull(v.displayWidth)
-        assertNull(v.displayHeight)
-    }
-
-    @Test
-    fun roundTrip_serverId() {
-        val v = Vehicle(
-            id = "local1",
-            ssid = "ApiAP",
-            sharedSecret = "legacy-secret",
-            serverId = "server-uuid-1"
-        )
-
-        val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v))).single()
-
-        assertEquals("local1", result.id)
-        assertEquals("server-uuid-1", result.serverId)
-    }
-
-    @Test
-    fun fromJson_serverIdDefaultsToNullWhenMissing() {
-        val json = org.json.JSONObject().apply {
-            put("ssid", "OldHU")
-            put("shared_secret", "abc")
-        }
-
-        val v = Vehicle.fromJson(json)
-
-        assertNull(v.serverId)
+        listOf(missingClient, blankClient, missingSecret, malformedSecret, shortSecret)
+            .forEach { json ->
+                assertThrows(Exception::class.java) { Vehicle.fromJson(json) }
+            }
     }
 
     @Test
     fun emptyJson_returnsEmptyList() {
         assertEquals(emptyList<Vehicle>(), Vehicle.listFromJson(""))
     }
+
+    private fun vehicle(
+        id: String,
+        ssid: String,
+        name: String = ssid,
+        serverId: String? = null,
+        socks5Enabled: Boolean = true,
+        audioKeepAlive: Boolean = false,
+        settingsHost: String? = null,
+        settingsPort: Int? = null,
+        displayWidth: Int? = null,
+        displayHeight: Int? = null
+    ) = Vehicle(
+        id = id,
+        ssid = ssid,
+        name = name,
+        apiClientId = "client-$id",
+        apiSecretHex = "ab".repeat(32),
+        serverId = serverId,
+        socks5Enabled = socks5Enabled,
+        audioKeepAlive = audioKeepAlive,
+        settingsHost = settingsHost,
+        settingsPort = settingsPort,
+        displayWidth = displayWidth,
+        displayHeight = displayHeight
+    )
+
+    private fun requiredJson(ssid: String = "ApiAP"): JSONObject = JSONObject()
+        .put("ssid", ssid)
+        .put("api_client_id", "client-123")
+        .put("api_secret_hex", "ab".repeat(32))
 }

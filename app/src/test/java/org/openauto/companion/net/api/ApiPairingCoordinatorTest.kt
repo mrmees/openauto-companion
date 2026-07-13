@@ -19,10 +19,8 @@ class ApiPairingCoordinatorTest {
             initialVehicles = listOf(
                 Vehicle(
                     ssid = "ExistingAP",
-                    sharedSecret = "",
                     apiClientId = "existing",
-                    apiSecretHex = ApiCrypto.toHex(ByteArray(32)),
-                    apiMode = Vehicle.ApiMode.EXTERNAL_API_V1
+                    apiSecretHex = ApiCrypto.toHex(ByteArray(32))
                 )
             )
         )
@@ -75,7 +73,6 @@ class ApiPairingCoordinatorTest {
         assertEquals(ApiCrypto.toHex(secret), vehicle.apiSecretHex)
         assertEquals("server-uuid-1", vehicle.serverId)
         assertEquals("10.0.0.42", vehicle.settingsHost)
-        assertEquals(Vehicle.ApiMode.EXTERNAL_API_V1, vehicle.apiMode)
         assertEquals(listOf(vehicle), harness.savedVehicles)
         assertEquals("10.0.0.42", harness.transportHost)
         assertEquals(ApiTcpTransport.DEFAULT_PORT, harness.transportPort)

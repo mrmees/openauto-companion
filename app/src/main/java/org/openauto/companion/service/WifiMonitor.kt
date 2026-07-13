@@ -127,8 +127,8 @@ class WifiMonitor(
     fun getWifiNetwork(): Network? = wifiNetwork
 
     private fun startCompanionService(vehicle: Vehicle) {
-        val clientId = vehicle.apiClientId?.trim().orEmpty()
-        val secretHex = vehicle.apiSecretHex?.trim().orEmpty()
+        val clientId = vehicle.apiClientId.trim()
+        val secretHex = vehicle.apiSecretHex.trim()
         if (!hasValidRuntimeCredentials(vehicle)) {
             Log.w(TAG, "Refusing to start service for vehicle without valid API v1 credentials")
             return
@@ -148,9 +148,8 @@ class WifiMonitor(
     }
 
     private fun hasValidRuntimeCredentials(vehicle: Vehicle): Boolean =
-        vehicle.apiMode == Vehicle.ApiMode.EXTERNAL_API_V1 &&
-            !vehicle.apiClientId.isNullOrBlank() &&
-            ApiCrypto.decodeSecretHex(vehicle.apiSecretHex.orEmpty()) != null
+        vehicle.apiClientId.isNotBlank() &&
+            ApiCrypto.decodeSecretHex(vehicle.apiSecretHex) != null
 
     private fun stopCompanionService() {
         context.stopService(Intent(context, CompanionService::class.java))

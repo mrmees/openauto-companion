@@ -30,7 +30,10 @@ class VehicleStorageMigrationTest {
             rawVehiclesJson = JSONArray().put(legacy).put(valid).toString()
         )!!
 
-        val survivor = VehicleStorageMigration.activeVehicles(plan.vehiclesJson).single()
+        val survivor = VehicleStorageMigration.activeVehicles(
+            plan.vehiclesJson,
+            storedVersion = plan.targetVersion
+        ).single()
         assertEquals("v1", survivor.id)
         assertEquals("My Car", survivor.name)
         assertEquals("server-1", survivor.serverId)
@@ -83,11 +86,22 @@ class VehicleStorageMigrationTest {
 
     @Test
     fun completedMarkerSkipsPurgeSoLaterV1VehiclesRemainUntouched() {
+        val currentJson = validV1Json().apply {
+            remove("api_mode")
+            remove("shared_secret")
+        }
         assertNull(
             VehicleStorageMigration.plan(
                 storedVersion = VehicleStorageMigration.CURRENT_VERSION,
-                rawVehiclesJson = JSONArray().put(validV1Json()).toString()
+                rawVehiclesJson = JSONArray().put(currentJson).toString()
             )
+        )
+        assertEquals(
+            listOf("ProdigyAP"),
+            VehicleStorageMigration.activeVehicles(
+                JSONArray().put(currentJson).toString(),
+                storedVersion = VehicleStorageMigration.CURRENT_VERSION
+            ).map { it.ssid }
         )
     }
 

@@ -30,10 +30,8 @@ class ApiPairingCredentialStoreTest {
         assertEquals(saved!!.single(), vehicle)
         assertEquals("ProdigyAP", vehicle!!.ssid)
         assertEquals("My Car", vehicle.name)
-        assertEquals("", vehicle.sharedSecret)
         assertEquals("client-123", vehicle.apiClientId)
         assertEquals(ApiCrypto.toHex(secret), vehicle.apiSecretHex)
-        assertEquals(Vehicle.ApiMode.EXTERNAL_API_V1, vehicle.apiMode)
         assertEquals("server-uuid-1", vehicle.serverId)
         assertEquals("10.0.0.42", vehicle.settingsHost)
     }
@@ -57,7 +55,7 @@ class ApiPairingCredentialStoreTest {
 
     @Test
     fun persistNewPairing_rejectsIncompleteCredentialsAndDuplicateSsid() {
-        val existing = Vehicle(ssid = "ExistingAP", sharedSecret = "legacy")
+        val existing = existingVehicle(ssid = "ExistingAP")
         var saved = false
         val store = store(
             load = { listOf(existing) },
@@ -103,7 +101,7 @@ class ApiPairingCredentialStoreTest {
     @Test
     fun containsSsidUsesTrimmedExactWifiIdentity() {
         val store = store(
-            load = { listOf(Vehicle(ssid = "ProdigyAP", sharedSecret = "legacy")) },
+            load = { listOf(existingVehicle(ssid = "ProdigyAP")) },
             save = {}
         )
 
@@ -113,7 +111,7 @@ class ApiPairingCredentialStoreTest {
 
     @Test
     fun persistSystemStatus_updatesDisplayDimensionsForMatchedVehicle() {
-        val initial = Vehicle(id = "veh-1", ssid = "CarAP", sharedSecret = "legacy")
+        val initial = existingVehicle(id = "veh-1", ssid = "CarAP")
         var saved: List<Vehicle>? = null
         val store = store(load = { listOf(initial) }, save = { saved = it })
 
@@ -132,7 +130,7 @@ class ApiPairingCredentialStoreTest {
 
     @Test
     fun persistSystemStatus_returnsFalseWhenDimensionsAreIncompleteInvalidOrVehicleMissing() {
-        val initial = Vehicle(id = "veh-1", ssid = "CarAP", sharedSecret = "legacy")
+        val initial = existingVehicle(id = "veh-1", ssid = "CarAP")
         var saved = false
         val store = store(load = { listOf(initial) }, save = { saved = true })
         val missingHeight = SystemProto.SystemStatus.newBuilder()
@@ -157,6 +155,16 @@ class ApiPairingCredentialStoreTest {
         load: () -> List<Vehicle>,
         save: (List<Vehicle>) -> Unit
     ) = ApiPairingCredentialStore(loadVehicles = load, saveVehicles = save)
+
+    private fun existingVehicle(
+        id: String = "existing",
+        ssid: String
+    ) = Vehicle(
+        id = id,
+        ssid = ssid,
+        apiClientId = "client-$id",
+        apiSecretHex = "ab".repeat(32)
+    )
 
     private fun readyWithCredentials(
         clientId: String,

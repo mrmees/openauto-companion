@@ -18,13 +18,16 @@ object VehicleStorageMigration {
     fun plan(storedVersion: Int, rawVehiclesJson: String): Plan? {
         if (storedVersion >= CURRENT_VERSION) return null
         return Plan(
-            vehiclesJson = Vehicle.listToJson(activeVehicles(rawVehiclesJson)),
+            vehiclesJson = Vehicle.listToJson(activeVehicles(rawVehiclesJson, storedVersion)),
             keysToRemove = LEGACY_KEYS,
             targetVersion = CURRENT_VERSION
         )
     }
 
-    fun activeVehicles(rawVehiclesJson: String): List<Vehicle> {
+    fun activeVehicles(
+        rawVehiclesJson: String,
+        storedVersion: Int = 0
+    ): List<Vehicle> {
         if (rawVehiclesJson.isBlank()) return emptyList()
         val array = try {
             JSONArray(rawVehiclesJson)
@@ -35,31 +38,37 @@ object VehicleStorageMigration {
         return buildList {
             for (index in 0 until array.length()) {
                 val json = array.optJSONObject(index) ?: continue
-                val vehicle = parseTransitionalVehicle(json) ?: continue
+                val vehicle = if (storedVersion >= CURRENT_VERSION) {
+                    parseCurrentVehicle(json)
+                } else {
+                    parseTransitionalVehicle(json)
+                } ?: continue
                 if (isValidV1(vehicle)) add(vehicle)
             }
         }
     }
 
     fun isValidV1(vehicle: Vehicle): Boolean =
-        vehicle.apiMode == Vehicle.ApiMode.EXTERNAL_API_V1 &&
-            !vehicle.apiClientId.isNullOrBlank() &&
-            ApiCrypto.decodeSecretHex(vehicle.apiSecretHex.orEmpty()) != null
+        vehicle.apiClientId.isNotBlank() &&
+            ApiCrypto.decodeSecretHex(vehicle.apiSecretHex) != null
+
+    private fun parseCurrentVehicle(json: JSONObject): Vehicle? = try {
+        Vehicle.fromJson(json)
+    } catch (_: Exception) {
+        null
+    }
 
     private fun parseTransitionalVehicle(json: JSONObject): Vehicle? {
         return try {
+            if (json.optString("api_mode") != "external_api_v1") return null
             val ssid = json.getString("ssid").trim()
             if (ssid.isBlank()) return null
             Vehicle(
                 id = json.optString("id", "").ifBlank { stableIdForSsid(ssid) },
                 ssid = ssid,
                 name = json.optString("name", ssid).ifBlank { ssid },
-                sharedSecret = json.optString("shared_secret", ""),
-                apiClientId = json.optString("api_client_id", "").trim().ifBlank { null },
-                apiSecretHex = json.optString("api_secret_hex", "").trim().ifBlank { null },
-                apiMode = Vehicle.ApiMode.fromJson(
-                    json.optString("api_mode", Vehicle.ApiMode.LEGACY.jsonValue)
-                ),
+                apiClientId = json.getString("api_client_id").trim(),
+                apiSecretHex = json.getString("api_secret_hex").trim(),
                 serverId = json.optString("server_id", "").trim().ifBlank { null },
                 socks5Enabled = json.optBoolean("socks5_enabled", true),
                 audioKeepAlive = json.optBoolean("audio_keep_alive", false),
