@@ -81,7 +81,7 @@ class VehicleSerializationTest {
         val v = Vehicle(
             id = "api1",
             ssid = "ApiAP",
-            sharedSecret = "legacy-secret",
+            sharedSecret = "",
             apiClientId = "client-123",
             apiSecretHex = secretHex,
             apiMode = Vehicle.ApiMode.EXTERNAL_API_V1
@@ -89,7 +89,7 @@ class VehicleSerializationTest {
 
         val result = Vehicle.listFromJson(Vehicle.listToJson(listOf(v))).single()
 
-        assertEquals("legacy-secret", result.sharedSecret)
+        assertEquals("", result.sharedSecret)
         assertEquals("client-123", result.apiClientId)
         assertEquals(secretHex, result.apiSecretHex)
         assertEquals(Vehicle.ApiMode.EXTERNAL_API_V1, result.apiMode)
