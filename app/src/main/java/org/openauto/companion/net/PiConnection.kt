@@ -128,23 +128,15 @@ class PiConnection(
     }
 
     private fun createSocket(): Socket {
-        if (wifiNetwork == null) return Socket()
-
-        return try {
-            // Preferred path: force socket over the matched Wi-Fi network.
+        if (wifiNetwork != null) {
             Log.i(TAG, "Creating socket bound to WiFi network")
-            wifiNetwork.socketFactory.createSocket() as Socket
-        } catch (e: Exception) {
-            // Some devices/ROMs deny bind-to-network from app UID (EPERM).
-            // Fallback keeps AA companion usable while preserving SOCKS5 egress
-            // behavior via ConnectivityManager in Socks5Server.
-            if (shouldFallbackToUnboundSocket(e)) {
-                Log.w(TAG, "WiFi-bound socket denied; falling back to unbound socket", e)
-                Socket()
-            } else {
-                throw e
-            }
         }
+        return NetworkSocketFactory.forNetwork(
+            network = wifiNetwork,
+            onFallback = { error ->
+                Log.w(TAG, "WiFi-bound socket denied; falling back to unbound socket", error)
+            }
+        ).invoke()
     }
 
     companion object {
@@ -167,14 +159,4 @@ internal fun decodeHexKey(hex: String): ByteArray? {
     } catch (_: Exception) {
         null
     }
-}
-
-internal fun shouldFallbackToUnboundSocket(error: Throwable?): Boolean {
-    var current = error
-    while (current != null) {
-        val msg = current.message.orEmpty()
-        if ("EPERM" in msg || "Operation not permitted" in msg) return true
-        current = current.cause
-    }
-    return false
 }

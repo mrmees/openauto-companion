@@ -19,9 +19,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.openauto.companion.net.NetworkSocketFactory
 import java.net.Inet4Address
 import java.net.InetSocketAddress
-import java.net.Socket
 
 @RunWith(AndroidJUnit4::class)
 class ApiV1LiveValidationTest {
@@ -35,7 +35,7 @@ class ApiV1LiveValidationTest {
             ?: ApiTcpTransport.DEFAULT_PORT
         val wifiNetwork = requireWifiNetwork(context)
 
-        wifiNetwork.socketFactory.createSocket().use { socket ->
+        NetworkSocketFactory.forNetwork(wifiNetwork).invoke().use { socket ->
             socket.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
         }
     }
@@ -50,7 +50,7 @@ class ApiV1LiveValidationTest {
             host = HOST,
             port = ApiTcpTransport.DEFAULT_PORT,
             connectTimeoutMs = CONNECT_TIMEOUT_MS,
-            socketFactory = { wifiNetwork.socketFactory.createSocket() as Socket }
+            socketFactory = NetworkSocketFactory.forNetwork(wifiNetwork)
         )
         val client = ApiSessionClient(
             transport = transport,
