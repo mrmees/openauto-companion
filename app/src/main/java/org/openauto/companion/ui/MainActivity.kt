@@ -56,6 +56,7 @@ class MainActivity : ComponentActivity() {
                 val isAudioKeepAliveActive by CompanionService.audioKeepAliveActive.collectAsStateWithLifecycle()
                 val connectedVehicleName by CompanionService.vehicleName.collectAsStateWithLifecycle()
                 val connectedVehicleId by CompanionService.vehicleId.collectAsStateWithLifecycle()
+                val connectionIssue by CompanionService.connectionIssue.collectAsStateWithLifecycle()
 
                 var showPairingSuccess by remember { mutableStateOf<String?>(null) }
                 var pairingError by remember { mutableStateOf<String?>(null) }
@@ -172,10 +173,16 @@ class MainActivity : ComponentActivity() {
                     is Screen.Status -> {
                         BackHandler { screen = Screen.VehicleList }
                         val vehicle = s.vehicle
-                        val isThisConnected = isConnected &&
-                            VehicleIdentity.matches(vehicle.id, vehicle.ssid, connectedVehicleId)
+                        val isThisRuntime = VehicleIdentity.matches(
+                            vehicle.id,
+                            vehicle.ssid,
+                            connectedVehicleId
+                        )
+                        val isThisConnected = isConnected && isThisRuntime
                         val status = CompanionStatus(
                             connected = isThisConnected,
+                            headUnitAvailable = isThisRuntime,
+                            connectionMessage = connectionIssue.takeIf { isThisRuntime },
                             sharingTime = true,
                             sharingGps = true,
                             sharingBattery = true,
@@ -197,6 +204,7 @@ class MainActivity : ComponentActivity() {
                             onSocks5Toggle = {
                                 socks5Enabled = it
                                 prefs.updateVehicle(vehicle.id) { v -> v.copy(socks5Enabled = it) }
+                                CompanionService.setInternetSharingStatic(vehicle.id, it)
                             },
                             audioKeepAlive = audioKeepAlive,
                             onAudioKeepAliveToggle = {
