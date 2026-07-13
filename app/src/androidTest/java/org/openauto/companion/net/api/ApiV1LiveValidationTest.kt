@@ -80,9 +80,13 @@ class ApiV1LiveValidationTest {
                         result.serverHello.serverId.isBlank()
                     )
                 }
-                is ApiSessionClient.ConnectResult.Terminal -> {
+                is ApiSessionClient.ConnectResult.Rejected -> {
                     // Tolerate early close on invalid auth until head-unit terminal rejection frames are delivered.
                     assertFalse("Terminal reason should not be blank", result.reason.isBlank())
+                }
+                is ApiSessionClient.ConnectResult.Disconnected -> {
+                    // Invalid auth may close before the terminal frame is flushed on current hardware.
+                    assertFalse("Disconnect reason should not be blank", result.reason.isBlank())
                 }
             }
         } finally {
