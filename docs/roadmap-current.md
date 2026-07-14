@@ -2,23 +2,24 @@
 
 Governance: capture new ideas in `docs/wishlist.md`; only promoted items should appear in this roadmap.
 
-## Now
+## Recently Completed
 
-- External API v1 companion migration foundation: vendor the frozen protobuf
-  contract, add codegen, and build the codec/handshake/report/transport and
-  credential-storage layer beside the legacy `9876` path.
-  - Rationale: the head-unit External API v1 contract is merged and frozen, so
-    Companion can prepare for live client validation without destabilizing the
-    current runtime path.
-  - Dependency check: app-bound Pixel probes now reach v1 ports `9810` and
-    `9811`, and the real head-unit software now includes v1.1 fields plus
-    proxy-route teardown behavior. Full auth/READY validation still needs a
-    pairing window or stored known-client credentials. Theme transfer now uses
-    the delivered web-config HTTP upload endpoint, while non-theme legacy
-    traffic remains available during the broader runtime migration.
-  - Outcome: v1 protocol, transport, credential persistence, and v1.1
-    field-handling foundations are unit-tested while legacy service, settings,
-    SOCKS5, and theme transfer behavior remain available.
+- External API v1 companion cutover — completed and live-validated 2026-07-13.
+  - Manual PIN pairing, stored-client reconnect, time/GPS/battery/connectivity
+    reports, immediate bridge toggling, owner clearing, and replay all passed
+    on the Pixel/Prodigy bench over Wi-Fi-bound TCP `9810`.
+  - Prodigy ran with `companion.enabled: false`; TCP `9876` was absent and the
+    guarded phone-side refusal probe passed. Android Auto's established `5277`
+    session remained up through Companion toggle, force-stop, and reconnect.
+- API v1 QR pairing — completed and live-validated 2026-07-13.
+  - The Pixel scanned the QR rendered on Prodigy's External API page and
+    reached READY without manual input; the advertised endpoint and credentials
+    persisted, and saved-client reconnect passed after force-stop/relaunch.
+  - With no pairing window open, Companion received the deployed typed code `5`
+    response and showed the specific retryable pairing-window-closed message.
+    This passed after Prodigy fixed real-socket terminal-frame flushing.
+
+## Now
 
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
   - Rationale: this is the highest-priority product goal for the next 60 days.

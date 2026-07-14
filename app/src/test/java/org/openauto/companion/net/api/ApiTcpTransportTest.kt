@@ -14,6 +14,29 @@ import kotlin.concurrent.thread
 
 class ApiTcpTransportTest {
     @Test
+    fun setReadTimeoutMillis_updatesConnectedSocket() = runTest {
+        val server = ServerSocket(0)
+        val accepted = FutureTask {
+            server.use { it.accept().use { } }
+        }
+        thread(name = "api-tcp-timeout-test-server", start = true) { accepted.run() }
+        val socket = Socket()
+
+        ApiTcpTransport(
+            host = "127.0.0.1",
+            port = server.localPort,
+            socketFactory = { socket }
+        ).use { transport ->
+            transport.connect()
+
+            transport.setReadTimeoutMillis(4_321)
+
+            assertEquals(4_321, socket.soTimeout)
+        }
+        accepted.get()
+    }
+
+    @Test
     fun sendAndReceive_usesLengthPrefixedApiMessages() = runTest {
         val server = ServerSocket(0)
         val expectedRequest = Api.ApiMessage.newBuilder()

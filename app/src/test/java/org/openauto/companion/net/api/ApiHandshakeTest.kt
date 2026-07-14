@@ -27,6 +27,7 @@ class ApiHandshakeTest {
         val hello = handshake.start()
 
         assertEquals(Api.ApiMessage.PayloadCase.CLIENT_HELLO, hello.payloadCase)
+        assertEquals(1L, hello.requestId)
         assertEquals(1, hello.clientHello.requestedApiVersionMajor)
         assertEquals(1, hello.clientHello.requestedApiVersionMinor)
         assertEquals("Pixel 9", hello.clientHello.clientName)
@@ -37,6 +38,7 @@ class ApiHandshakeTest {
         val authResponse = handshake.handle(authRequired(nonce)).requireSend()
 
         assertEquals(Api.ApiMessage.PayloadCase.AUTH_RESPONSE, authResponse.payloadCase)
+        assertEquals(hello.requestId, authResponse.requestId)
         assertEquals("client-123", authResponse.authResponse.clientId)
         assertArrayEquals(
             ApiCrypto.hmacSha256(clientSecret, nonce),
@@ -61,12 +63,14 @@ class ApiHandshakeTest {
         val hello = handshake.start()
 
         assertEquals(Api.ApiMessage.PayloadCase.CLIENT_HELLO, hello.payloadCase)
+        assertEquals(1L, hello.requestId)
         assertTrue(hello.clientHello.auth.pairingRequest)
         assertEquals("", hello.clientHello.auth.clientId)
 
         val pairingResponse = handshake.handle(pairingChallenge(nonce, salt)).requireSend()
 
         assertEquals(Api.ApiMessage.PayloadCase.PAIRING_RESPONSE, pairingResponse.payloadCase)
+        assertEquals(hello.requestId, pairingResponse.requestId)
         assertArrayEquals(
             ApiCrypto.hmacSha256(expectedSecret, nonce),
             pairingResponse.pairingResponse.proof.toByteArray()
@@ -95,10 +99,17 @@ class ApiHandshakeTest {
         val handshake = ApiHandshake.knownClient("Pixel 9", "client-123", clientSecret)
         handshake.start()
 
-        val terminal = handshake.handle(error("pairing window closed")).requireTerminal()
+        val terminal = handshake.handle(
+            error(
+                message = "Pairing window closed",
+                code = Common.ErrorCode.ERROR_CODE_PAIRING_WINDOW_CLOSED,
+                requestId = 7
+            )
+        ).requireTerminal()
 
         assertEquals(ApiHandshake.State.TERMINAL, handshake.state)
-        assertEquals("pairing window closed", terminal.reason)
+        assertEquals("Pairing window closed", terminal.reason)
+        assertEquals(Common.ErrorCode.ERROR_CODE_PAIRING_WINDOW_CLOSED, terminal.errorCode)
     }
 
     @Test
@@ -157,11 +168,16 @@ class ApiHandshakeTest {
             .setAuthReject(Api.AuthReject.newBuilder().setReason(reason).build())
             .build()
 
-    private fun error(message: String): Api.ApiMessage =
+    private fun error(
+        message: String,
+        code: Common.ErrorCode = Common.ErrorCode.ERROR_CODE_AUTH_FAILED,
+        requestId: Long = 0
+    ): Api.ApiMessage =
         Api.ApiMessage.newBuilder()
+            .setRequestId(requestId)
             .setError(
                 Common.Error.newBuilder()
-                    .setCode(Common.ErrorCode.ERROR_CODE_AUTH_FAILED)
+                    .setCode(code)
                     .setMessage(message)
                     .build()
             )

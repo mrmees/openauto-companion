@@ -11,20 +11,16 @@ import prodigy.api.v1.System as SystemProto
 
 class ApiPairingCredentialStoreTest {
     @Test
-    fun persistPairingResult_updatesMatchedVehicleWithV1Credentials() {
+    fun persistNewPairing_createsCompleteV1Vehicle() {
         val secret = ByteArray(32) { it.toByte() }
-        val initial = listOf(
-            Vehicle(id = "veh-1", ssid = "CarAP", sharedSecret = "legacy-secret"),
-            Vehicle(id = "veh-2", ssid = "OtherAP", sharedSecret = "other-secret")
-        )
         var saved: List<Vehicle>? = null
-        val store = ApiPairingCredentialStore(
-            loadVehicles = { initial },
-            saveVehicles = { saved = it }
-        )
+        val store = store(load = { emptyList() }, save = { saved = it })
 
-        val result = store.persistPairingResult(
-            vehicleId = "veh-1",
+        val vehicle = store.persistNewPairing(
+            ssid = "ProdigyAP",
+            displayName = "My Car",
+            host = "10.0.0.42",
+            tcpPort = 19810,
             ready = readyWithCredentials(
                 clientId = "client-123",
                 secret = secret,
@@ -32,79 +28,99 @@ class ApiPairingCredentialStoreTest {
             )
         )
 
-        assertTrue(result)
-        val updated = saved!!.first { it.id == "veh-1" }
-        assertEquals("legacy-secret", updated.sharedSecret)
-        assertEquals("client-123", updated.apiClientId)
-        assertEquals(ApiCrypto.toHex(secret), updated.apiSecretHex)
-        assertEquals(Vehicle.ApiMode.EXTERNAL_API_V1, updated.apiMode)
-        assertEquals("server-uuid-1", updated.serverId)
-        assertEquals(Vehicle.ApiMode.LEGACY, saved!!.first { it.id == "veh-2" }.apiMode)
+        assertEquals(saved!!.single(), vehicle)
+        assertEquals("ProdigyAP", vehicle!!.ssid)
+        assertEquals("My Car", vehicle.name)
+        assertEquals("client-123", vehicle.apiClientId)
+        assertEquals(ApiCrypto.toHex(secret), vehicle.apiSecretHex)
+        assertEquals("server-uuid-1", vehicle.serverId)
+        assertEquals(19810, vehicle.apiTcpPort)
+        assertEquals("10.0.0.42", vehicle.settingsHost)
     }
 
     @Test
-    fun persistPairingResult_returnsFalseWhenReadyHasNoPairingCredentials() {
-        var saved = false
-        val store = ApiPairingCredentialStore(
-            loadVehicles = { listOf(Vehicle(id = "veh-1", ssid = "CarAP", sharedSecret = "legacy")) },
-            saveVehicles = { saved = true }
+    fun persistNewPairing_usesSsidAsBlankDisplayNameAndOmitsMissingServerId() {
+        var saved: List<Vehicle>? = null
+        val store = store(load = { emptyList() }, save = { saved = it })
+
+        val vehicle = store.persistNewPairing(
+            ssid = "ProdigyAP",
+            displayName = "  ",
+            host = "10.0.0.1",
+            tcpPort = ApiTcpTransport.DEFAULT_PORT,
+            ready = readyWithCredentials("client", ByteArray(32))
         )
 
-        val result = store.persistPairingResult(
-            vehicleId = "veh-1",
-            ready = ApiSessionClient.ConnectResult.Ready(
-                serverHello = serverHello(),
-                pairedCredentials = null
+        assertEquals("ProdigyAP", vehicle!!.name)
+        assertNull(vehicle.serverId)
+        assertEquals(vehicle, saved!!.single())
+    }
+
+    @Test
+    fun persistNewPairing_rejectsIncompleteCredentialsAndDuplicateSsid() {
+        val existing = existingVehicle(ssid = "ExistingAP")
+        var saved = false
+        val store = store(
+            load = { listOf(existing) },
+            save = { saved = true }
+        )
+        val noCredentials = ApiSessionClient.ConnectResult.Ready(serverHello(), null)
+
+        assertNull(
+            store.persistNewPairing(
+                "NewAP",
+                "New",
+                "10.0.0.1",
+                ApiTcpTransport.DEFAULT_PORT,
+                noCredentials
             )
         )
-
-        assertFalse(result)
+        assertNull(
+            store.persistNewPairing(
+                "NewAP",
+                "New",
+                "10.0.0.1",
+                ApiTcpTransport.DEFAULT_PORT,
+                readyWithCredentials("", ByteArray(32))
+            )
+        )
+        assertNull(
+            store.persistNewPairing(
+                "NewAP",
+                "New",
+                "10.0.0.1",
+                ApiTcpTransport.DEFAULT_PORT,
+                readyWithCredentials("client", ByteArray(31))
+            )
+        )
+        assertNull(
+            store.persistNewPairing(
+                "ExistingAP",
+                "Existing",
+                "10.0.0.1",
+                ApiTcpTransport.DEFAULT_PORT,
+                readyWithCredentials("client", ByteArray(32))
+            )
+        )
         assertFalse(saved)
     }
 
     @Test
-    fun persistPairingResult_returnsFalseWhenVehicleIsMissing() {
-        var saved = false
-        val store = ApiPairingCredentialStore(
-            loadVehicles = { listOf(Vehicle(id = "veh-1", ssid = "CarAP", sharedSecret = "legacy")) },
-            saveVehicles = { saved = true }
+    fun containsSsidUsesTrimmedExactWifiIdentity() {
+        val store = store(
+            load = { listOf(existingVehicle(ssid = "ProdigyAP")) },
+            save = {}
         )
 
-        val result = store.persistPairingResult(
-            vehicleId = "unknown",
-            ready = readyWithCredentials("client-123", ByteArray(32) { it.toByte() })
-        )
-
-        assertFalse(result)
-        assertFalse(saved)
-    }
-
-    @Test
-    fun persistPairingResult_returnsFalseForInvalidSecretSize() {
-        val original = Vehicle(id = "veh-1", ssid = "CarAP", sharedSecret = "legacy")
-        var saved: List<Vehicle>? = null
-        val store = ApiPairingCredentialStore(
-            loadVehicles = { listOf(original) },
-            saveVehicles = { saved = it }
-        )
-
-        val result = store.persistPairingResult(
-            vehicleId = "veh-1",
-            ready = readyWithCredentials("client-123", ByteArray(31) { it.toByte() })
-        )
-
-        assertFalse(result)
-        assertNull(saved)
+        assertTrue(store.containsSsid(" ProdigyAP "))
+        assertFalse(store.containsSsid("prodigyap"))
     }
 
     @Test
     fun persistSystemStatus_updatesDisplayDimensionsForMatchedVehicle() {
-        val initial = Vehicle(id = "veh-1", ssid = "CarAP", sharedSecret = "legacy")
+        val initial = existingVehicle(id = "veh-1", ssid = "CarAP")
         var saved: List<Vehicle>? = null
-        val store = ApiPairingCredentialStore(
-            loadVehicles = { listOf(initial) },
-            saveVehicles = { saved = it }
-        )
+        val store = store(load = { listOf(initial) }, save = { saved = it })
 
         val result = store.persistSystemStatus(
             vehicleId = "veh-1",
@@ -120,14 +136,10 @@ class ApiPairingCredentialStoreTest {
     }
 
     @Test
-    fun persistSystemStatus_returnsFalseWhenDimensionsAreIncompleteOrInvalid() {
-        val initial = Vehicle(id = "veh-1", ssid = "CarAP", sharedSecret = "legacy")
+    fun persistSystemStatus_returnsFalseWhenDimensionsAreIncompleteInvalidOrVehicleMissing() {
+        val initial = existingVehicle(id = "veh-1", ssid = "CarAP")
         var saved = false
-        val store = ApiPairingCredentialStore(
-            loadVehicles = { listOf(initial) },
-            saveVehicles = { saved = true }
-        )
-
+        val store = store(load = { listOf(initial) }, save = { saved = true })
         val missingHeight = SystemProto.SystemStatus.newBuilder()
             .setDisplayWidth(1024)
             .build()
@@ -135,57 +147,49 @@ class ApiPairingCredentialStoreTest {
             .setDisplayWidth(0)
             .setDisplayHeight(600)
             .build()
+        val valid = SystemProto.SystemStatus.newBuilder()
+            .setDisplayWidth(1024)
+            .setDisplayHeight(600)
+            .build()
 
         assertFalse(store.persistSystemStatus("veh-1", missingHeight))
         assertFalse(store.persistSystemStatus("veh-1", zeroWidth))
+        assertFalse(store.persistSystemStatus("unknown", valid))
         assertFalse(saved)
     }
 
-    @Test
-    fun persistSystemStatus_returnsFalseWhenVehicleIsMissing() {
-        var saved = false
-        val store = ApiPairingCredentialStore(
-            loadVehicles = {
-                listOf(Vehicle(id = "veh-1", ssid = "CarAP", sharedSecret = "legacy"))
-            },
-            saveVehicles = { saved = true }
-        )
+    private fun store(
+        load: () -> List<Vehicle>,
+        save: (List<Vehicle>) -> Unit
+    ) = ApiPairingCredentialStore(loadVehicles = load, saveVehicles = save)
 
-        val result = store.persistSystemStatus(
-            vehicleId = "unknown",
-            systemStatus = SystemProto.SystemStatus.newBuilder()
-                .setDisplayWidth(1024)
-                .setDisplayHeight(600)
-                .build()
-        )
-
-        assertFalse(result)
-        assertFalse(saved)
-    }
+    private fun existingVehicle(
+        id: String = "existing",
+        ssid: String
+    ) = Vehicle(
+        id = id,
+        ssid = ssid,
+        apiClientId = "client-$id",
+        apiSecretHex = "ab".repeat(32)
+    )
 
     private fun readyWithCredentials(
         clientId: String,
         secret: ByteArray,
         serverId: String? = null
-    ): ApiSessionClient.ConnectResult.Ready =
-        ApiSessionClient.ConnectResult.Ready(
-            serverHello = serverHello(serverId = serverId),
-            pairedCredentials = ApiHandshake.PairedCredentials(
-                clientId = clientId,
-                secret = secret
-            )
-        )
+    ) = ApiSessionClient.ConnectResult.Ready(
+        serverHello = serverHello(serverId),
+        pairedCredentials = ApiHandshake.PairedCredentials(clientId, secret)
+    )
 
     private fun serverHello(serverId: String? = null): Api.ServerHello =
         Api.ServerHello.newBuilder()
             .setApiVersionMajor(1)
             .setApiVersionMinor(1)
             .setServerName("Prodigy")
-            .setAppVersion("v1-test")
-            .setSessionId("session-1")
+            .setAppVersion("test")
+            .setSessionId("session")
             .setCapabilities(Api.Capabilities.getDefaultInstance())
-            .apply {
-                if (!serverId.isNullOrBlank()) setServerId(serverId)
-            }
+            .apply { if (serverId != null) setServerId(serverId) }
             .build()
 }

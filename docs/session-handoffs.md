@@ -591,3 +591,366 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
   - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> NOT RUN (docs/process-only changes)
   - Additional checks (if any):
     - AA stream continuity: not tested (docs/process change)
+
+## 2026-07-13 12:44 (local)
+
+- What changed:
+  - Replaced the foreground service's combined legacy JSON/HMAC sender with a
+    single-generation External API v1 runtime using only Wi-Fi-bound TCP
+    `9810`.
+  - Added READY-session lifecycle handling, bounded reconnect backoff,
+    `server_id` enforcement, serialized/conflated reports, `TOPIC_SYSTEM`
+    subscription, and display-dimension persistence.
+  - Split cellular upstream ownership from SOCKS5, generated a random proxy
+    password per vehicle generation, kept the local listener across transient
+    API reconnects, and made the vehicle-scoped UI toggle immediate.
+  - Added live manual six-digit PIN pairing. A vehicle is saved only after a
+    complete READY result supplies a nonblank client id and 32-byte secret.
+    The QR route/button is dormant.
+  - Added a schema-gated synchronous migration that deletes legacy vehicle
+    records and old single-vehicle keys. Runtime reads still filter invalid
+    records if the commit must retry.
+  - Deleted `PiConnection`, `Protocol`, legacy tests, `Vehicle.sharedSecret`,
+    and `Vehicle.ApiMode`; production code has no path to TCP `9876`.
+  - Updated opt-in instrumentation for TCP `9810`, optional guarded `9876`
+    refusal, and optional real known-client credentials without sending
+    reports.
+- Why:
+  - Complete the approved API v1 runtime cutover with manual pairing first,
+    delete legacy records during migration, and make transport exclusivity
+    structural before the live bench.
+- Sender mapping used:
+  - legacy time/timezone -> `TimeReport` after READY and on time/timezone change
+  - legacy GPS fields -> real-fix-only `GpsReport` at approximately 1 Hz
+  - legacy battery fields -> sticky/change-driven `BatteryReport`
+  - legacy SOCKS state -> upstream-aware `ConnectivityReport`
+  - legacy hello/display metadata -> authenticated v1 handshake plus
+    `TOPIC_SYSTEM` / `SystemStatus`
+- Status: in progress (implementation complete; live Pixel/Prodigy bench
+  pending)
+- Dependency decision:
+  - Companion-only: No
+  - Head-unit prerequisites are delivered; the remaining work is coordinated
+    hardware validation and the already-documented terminal-frame diagnostic.
+- Next steps:
+  - 1) Attach the Pixel via Windows ADB, install the debug APK, and run the
+    no-flag instrumentation guard.
+  - 2) Open a Prodigy pairing window and complete manual PIN pairing, known
+    client reconnect, report/display, and bridge toggle checks.
+  - 3) Run the Prodigy section 7 continuity scenarios, including API listener
+    restart and active Android Auto media continuity, then record evidence.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.api.*"`
+    -> PASS
+  - `./gradlew :app:testDebugUnitTest --tests "org.openauto.companion.net.Socks5ServerTest" --tests "org.openauto.companion.data.*" --tests "org.openauto.companion.service.*"`
+    -> PASS
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - `./gradlew :app:assembleDebugAndroidTest` -> PASS
+  - Structural scans -> no production `PiConnection`, legacy status/theme
+    builders, `ApiMode`, or `9876`; `shared_secret`/`api_mode` occur only in
+    `VehicleStorageMigration`.
+  - `/mnt/e/Android/Sdk/platform-tools/adb.exe devices` -> no attached device,
+    so the no-flag instrumentation selector was not run.
+- AA stream continuity: not tested in this implementation session; required in
+  Task 12 before completion.
+
+## 2026-07-13 15:43 (local)
+
+- What changed:
+  - Completed the live Pixel/Prodigy External API v1 cutover bench with
+    Prodigy's legacy listener disabled.
+  - Fixed live pairing on the Android Auto-owned Wi-Fi network. Android exposed
+    the network and direct `10.0.0.0/24` route but redacted its SSID from the
+    synchronous capability read, causing a false "connect to Wi-Fi" failure.
+    `WifiNetworkResolver` now keeps exact SSID matching first and falls back to
+    a direct-route match for the configured API host.
+  - Added an opt-in live resolver regression to the existing guarded API v1
+    instrumentation suite.
+- Why:
+  - Manual API pairing could reach `10.0.0.1:9810` from the app context but
+    failed before opening a session because network selection depended only on
+    SSID metadata that Android redacts for the AA-owned network.
+- Status: done; External API v1 runtime cutover and live validation complete.
+- Live results:
+  - Migration deleted the prior legacy record/keys and opened manual pairing.
+  - Manual PIN pairing reached READY and saved one API client id, 32-byte
+    secret, and server id; no legacy secret remained.
+  - Prodigy config persisted `companion.enabled: false`; startup logged the
+    disabled state, `ss` showed TCP `9810` only, and the guarded phone-side
+    `9876` refusal check passed.
+  - Saved-client reconnect passed after Prodigy restart and after Companion
+    force-stop/relaunch without another pairing window.
+  - Prodigy API IPC reported a real GPS fix, battery `62%` and charging,
+    connectivity active, and the phone SOCKS endpoint. A controlled UTC
+    mismatch was restored to `America/Chicago` by the API `TimeReport` and
+    recorded in the journal.
+  - Internet Sharing off immediately cleared the API proxy and SystemService
+    route; live verification returned disabled with listener/iptables/upstream
+    all false. Re-enable restored active with all three checks true.
+  - Companion force-stop immediately cleared connected/GPS/battery/proxy owner
+    state and the route; relaunch replayed reports and the route once. Pixel
+    logs showed no legacy fallback or `9876` attempt.
+  - The same established AA TCP `5277` socket remained present through bridge
+    toggles, Companion force-stop, and saved-client reconnect.
+- Operational note:
+  - Editing `~/.openauto/config.yaml` before `systemctl restart` is overwritten
+    by Prodigy's clean-shutdown config flush. The reliable order is stop the
+    service, edit `companion.enabled`, then start it. A timestamped pre-change
+    backup remains on the Pi.
+- Next steps:
+  - 1) Keep Prodigy `companion.enabled: false`; do not restore a legacy
+    fallback.
+  - 2) Continue the existing deterministic Pi desktop/system routing priority.
+  - 3) Treat API QR pairing as a future convenience slice; manual PIN pairing
+    remains the supported path.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - `./gradlew :app:assembleDebugAndroidTest` -> PASS
+  - No-flag `ApiV1LiveValidationTest` -> PASS (`OK`, all tests safely skipped)
+  - Guarded live `ApiV1LiveValidationTest` with API/SSID/legacy-refusal flags ->
+    PASS
+  - Pi `ss -ltnp` -> `9810` listening; no `9876`
+  - SystemService `get_proxy_status {verify:true}` -> correct active/disabled/
+    active transitions with no error
+  - AA stream continuity: PASS by stable established TCP `5277` session across
+    Companion lifecycle and bridge operations
+
+## 2026-07-13 21:02 (local)
+
+- What changed:
+  - Activated the existing CameraX/ML Kit scanner from the pairing screen while
+    retaining manual SSID/name/PIN entry.
+  - Replaced the dormant legacy QR parser with defensive parsing for the
+    approved additive `prodigy://pair` contract: required host, TCP/WebSocket
+    ports, six-digit PIN, and percent-decoded SSID; unknown fields are ignored.
+  - Routed valid scans through the existing live API v1 challenge/response
+    coordinator without changing credential derivation or persistence timing.
+  - Added persisted `api_tcp_port` with a backward-compatible `9810` default
+    and carried it through pairing, Wi-Fi monitor service startup, and runtime
+    reconnects.
+  - Preserved structured External API error codes through the handshake/session
+    seam and added a clean retryable pairing-window-closed UI result, with an
+    `AuthReject` reason fallback for compatibility.
+  - Removed raw QR/PIN logs, made scanner completion single-shot, surfaced
+    camera startup errors, and unbound camera resources on exit.
+  - Added the QR design/implementation artifacts and updated vision/roadmap
+    alignment. Logged the Prodigy SSID/terminal-frame dependency as In Progress.
+- Why:
+  - Deliver zero-input API v1 pairing against the newly shipped head-unit QR
+    while keeping manual pairing reliable and ensuring advertised live TCP
+    endpoints also work after reconnect.
+- Status: Companion implementation complete; coordinated live bench pending the
+  updated Prodigy QR build and confirmed closed-window terminal frame.
+- Dependency decision:
+  - Companion-only: No
+  - Head-unit reference: External API v1 QR pairing SSID and terminal expiry
+    contract (`docs/project-vision.md`, In Progress).
+- Next steps:
+  - 1) Deploy the Prodigy build that adds percent-encoded `ssid` to the QR and
+    report its exact closed-window protobuf frame.
+  - 2) Install the Companion debug APK on the attached Pixel and bench
+    scan-to-READY plus saved-client reconnect/report flow.
+  - 3) Repeat after the 120-second window expires, then mark the dependency and
+    implementation plan complete if the clean error and manual fallback pass.
+- Verification:
+  - Focused QR/pairing/storage/handshake/session unit suite -> PASS.
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS (`BUILD SUCCESSFUL`).
+  - `./gradlew :app:assembleDebugAndroidTest` -> PASS (`BUILD SUCCESSFUL`).
+  - Structural log scan -> PASS; no raw QR value or PIN logging remains.
+  - `/mnt/e/Android/Sdk/platform-tools/adb.exe devices` -> Pixel
+    `39260DLJH000LX` attached.
+  - AA stream continuity: not tested; no APK was installed and no live runtime
+    was changed during this implementation session.
+
+## 2026-07-13 21:36 (local)
+
+- What changed:
+  - Installed the QR-pairing build on the attached Pixel and completed a
+    physical scan of the Prodigy bench QR with no manual entry.
+  - Verified that the advertised SSID, live TCP port, API host, and resulting
+    credentials were persisted; force-stop/relaunch reconnected as a saved
+    client without reopening a pairing window.
+  - Changed handshake messages to use the protocol-required nonzero request ID
+    (`1`) after the first closed-window probe exposed the prior zero value.
+  - Added an exact codec regression for the documented 29-byte
+    `ERROR_CODE_PAIRING_WINDOW_CLOSED` payload and its four-byte TCP length
+    prefix.
+  - Updated the QR plan and project dependency status to distinguish completed
+    Companion behavior from the remaining Prodigy live terminal-frame issue.
+- Why:
+  - Close the physical zero-input pairing acceptance criteria and determine
+    whether the documented closed/expired-window behavior is actually present
+    on the deployed remote TCP path.
+- Status: partial. Companion QR pairing and saved-client reconnect pass. The
+  closed-window acceptance criterion is blocked by the deployed Prodigy TCP
+  path closing before the promised typed error frame is received.
+- Live results:
+  - Head-unit QR -> Companion scan -> READY succeeded without typing an SSID,
+    endpoint, or PIN.
+  - The saved vehicle contains `Prodigy_e57d`, API host `10.0.0.1`, and TCP port
+    `9810`; credential presence was verified without exposing credential
+    values.
+  - Force-stop/relaunch returned the vehicle to Connected without a new pairing
+    window. The final phone state was Connected with Time and GPS reports
+    active.
+  - A no-window attempt using the original request ID `0` ended at EOF before
+    the four-byte TCP prefix. After correcting Companion to use request ID `1`,
+    the same live attempt again ended at EOF before any terminal frame.
+  - Companion's transport regression receives a terminal frame written,
+    flushed, and immediately followed by close, so the remaining mismatch is
+    in the deployed Prodigy remote-socket delivery path rather than the
+    Companion decoder or close handling.
+- Next steps:
+  - 1) Have the Prodigy maintainer inspect and fix the deployed remote TCP
+    terminal-frame write/flush path, then redeploy it to the bench Pi.
+  - 2) Repeat never-opened and expired-window attempts and verify code `5`,
+    message `Pairing window closed`, request-ID echo, and clean close.
+  - 3) Confirm head-unit-side report reception and, if required for the release
+    gate, Android Auto continuity during the final rerun; then mark the QR plan
+    and dependency complete.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest`
+    -> PASS (`BUILD SUCCESSFUL`).
+  - Exact protobuf payload/prefix regression -> PASS.
+  - Debug APK install on Pixel `39260DLJH000LX` -> PASS.
+  - Physical QR scan-to-READY -> PASS; no manual input.
+  - Saved-client reconnect after force-stop/relaunch -> PASS.
+  - Closed-window typed error against deployed Prodigy TCP -> FAIL/BLOCKED;
+    EOF occurred before the length prefix for request IDs `0` and `1`.
+  - AA stream continuity: not specifically tested in this QR bench session.
+
+## 2026-07-13 22:13 (local)
+
+- What changed:
+  - Re-ran the closed-window Companion path against Prodigy's deployed
+    real-socket flush fix (`707be98`, `829f247`; pushed through `6c89903`).
+  - Reopened the pairing window through the local trusted External API,
+    navigated the head unit to its External API page, and completed a fresh
+    physical scan of the QR rendered there.
+  - Marked the QR pairing plan, roadmap item, SSID/expiry dependency, and
+    terminal-frame delivery dependency complete.
+- Why:
+  - Verify the previously failing production-lifetime TCP path on the same
+    Pixel/Prodigy bench and close the final QR acceptance criteria.
+- Status: complete. Both the typed closed-window path and zero-input physical
+  QR pairing pass against the fixed deployed Prodigy service.
+- Live results:
+  - With no window open, Companion received typed code `5` and displayed
+    `Pairing window closed. Start a new pairing window and scan again.` No
+    vehicle or credentials were persisted for the rejected attempt.
+  - The Prodigy External API page visibly rendered its active-window PIN and
+    QR. Companion's already-open camera recognized that physical QR, completed
+    pairing, and showed `Pairing Successful`; the server closed the window.
+  - The saved vehicle persisted `Prodigy_e57d`, host `10.0.0.1`, and TCP port
+    `9810`, with credential presence verified without logging their values.
+  - Force-stop/relaunch reconnected as a saved client without a new window.
+    Final Companion state is Connected with Time, GPS, Battery, and SOCKS5 all
+    Active.
+  - Prodigy route state changed to disabled on Companion force-stop and active
+    again after relaunch/reconnect.
+- Next steps:
+  - 1) Treat API v1 QR pairing as complete and include the Companion changes in
+    the normal review/commit workflow.
+  - 2) Continue the existing deterministic Pi desktop/system routing priority.
+  - 3) Run a dedicated AA-continuity observation only if that separate release
+    criterion still requires a QR-specific repetition.
+- Verification:
+  - Deployed no-window attempt -> PASS; specific typed-error UI observed.
+  - Physical head-unit QR scan-to-READY -> PASS; no manual pairing input.
+  - Persisted endpoint/credential-presence check -> PASS.
+  - Saved-client reconnect after force-stop/relaunch -> PASS.
+  - Final Companion status -> Connected; Time/GPS/Battery/SOCKS5 Active.
+  - Prodigy route teardown/replay journal evidence -> PASS.
+  - Previous full Gradle gate remains PASS; no Companion code changed during
+    this rerun.
+  - AA stream continuity: not specifically observed during this final rerun.
+
+## 2026-07-14 07:30 (local)
+
+- What changed:
+  - Added an explicit monitor lifecycle seam that distinguishes quiet monitor
+    replacement from full runtime teardown.
+  - `CompanionApp.startWifiMonitor()` now unregisters the previous monitor
+    without stopping `CompanionService`, installs the new monitor, and lets the
+    service's existing same-vehicle/same-network idempotence guard preserve the
+    live External API session.
+  - Kept real `WifiMonitor.onLost()` teardown unchanged. Explicit app-driven
+    refreshes used for pairing, unpairing, and vehicle-list changes still stop
+    the old service before starting the replacement monitor.
+  - Added JVM regression coverage for both quiet replacement and explicit
+    service-stopping teardown.
+- Why:
+  - Activity recreation reran monitor startup. The previous unconditional
+    monitor stop killed the correctly surviving foreground service, causing a
+    TCP reconnect and transient clearing of GPS/battery/connectivity state on
+    Prodigy whenever the phone rotated or the Activity was recreated.
+- Status: complete and live-validated on the Pixel/Prodigy bench.
+- Next steps:
+  - 1) Commit and push the Companion lifecycle fix after review.
+  - 2) Keep head-unit owner-disconnect clearing immediate; no Prodigy debounce
+    or stale-state masking is needed.
+  - 3) Continue the existing deterministic Pi desktop/system routing priority.
+- Verification:
+  - Red regression: focused test initially failed to compile because the
+    monitor lifecycle seam did not exist.
+  - `MonitorSlotTest` after implementation -> PASS.
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+    (`BUILD SUCCESSFUL`).
+  - Debug APK install on Pixel `39260DLJH000LX` -> PASS.
+  - Pi API TCP peer before rotation -> `[::ffff:10.0.0.21]:58062`.
+  - After forced rotation 1 -> same peer/source port `58062`.
+  - After forced rotation 2 -> same peer/source port `58062`.
+  - Prodigy journal during the two-rotation window -> no owner disconnect or
+    route teardown.
+  - Prodigy `companion_status` after rotations -> API source connected with
+    live GPS, battery, and internet state.
+
+## 2026-07-14 08:40 (local)
+
+- What changed:
+  - Classified API terminal failures by typed error code. `AuthReject` and
+    codes `NOT_AUTHENTICATED`/`AUTH_FAILED` require re-pairing; other
+    connection-level errors retry, while request-scoped errors remain on the
+    live session for their request owner.
+  - Added a five-second end-to-end handshake deadline and wired it to TCP's
+    socket read timeout, preventing accepted-but-stalled peers from pinning
+    pairing or runtime state indefinitely.
+  - Refined Activity recreation handling so the Application-owned Wi-Fi
+    monitor is reused instead of unregistered/re-registered. Explicit refresh
+    and real `onLost` paths still stop the runtime; shared callback state is
+    volatile, and redundant starts cannot kill a healthy generation when the
+    Wi-Fi handle is transiently unavailable.
+  - Preserved literal `+` characters in RFC 3986 pairing-query values while
+    retaining the frozen `%2B` QR contract.
+  - Closed failed SOCKS upstream sockets, applied idle timeouts to both relay
+    sides, and made timeout failures release the paired sockets and connection
+    slot while retaining normal half-close behavior.
+  - Made replayed GPS age advance from monotonic capture time rather than
+    replaying stale fixes as newly captured.
+  - Added focused JVM/socket regressions for each corrected path. The current
+    roadmap sequence did not change, so `docs/roadmap-current.md` was left
+    unchanged.
+- Why:
+  - Address the consolidated PR #4 review blocker and reliability findings
+    before moving the External API v1 migration out of draft review.
+- Status: complete, full-gate verified, and the refined rotation lifecycle is
+  live-validated on the attached Pixel. Product/security sign-off is resolved:
+  API credentials remain eligible for Android Auto Backup because convenient
+  restore is worth the low risk for this product; no legacy-record migration
+  notice is needed before there are users; and the plaintext LAN/offline-PIN
+  risk is accepted as minimal for a moving-vehicle installation.
+- Next steps:
+  - 1) Complete PR #4 review and merge when approved.
+  - 2) Continue the existing deterministic Pi desktop/system routing priority.
+- Verification:
+  - Red phase: the focused suite initially failed at the new monitor,
+    handshake-timeout, and GPS freshness seams before implementation.
+  - Focused regression set (API session/runtime/reporting, URI parser, monitor,
+    SOCKS, and location mapper) -> PASS (53 tests in that focused run).
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+    (`BUILD SUCCESSFUL`; 163 unit tests, zero failures).
+  - `git diff --check` -> PASS.
+  - Debug APK install on Pixel `39260DLJH000LX` -> PASS.
+  - API TCP peer after reconnect -> `[::ffff:10.0.0.21]:39004`; after forced
+    portrait/landscape rotations and restoring auto-rotate -> unchanged source
+    port `39004` throughout.

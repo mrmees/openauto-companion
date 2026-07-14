@@ -1,5 +1,14 @@
 # External API v1 Migration Plan
 
+> **Historical foundation plan — superseded for runtime integration and
+> retirement.** The additive foundation described here was completed. The
+> 2026-07-13 runtime cutover is governed by
+> `docs/superpowers/specs/2026-07-13-api-v1-runtime-cutover-design.md` and
+> `docs/superpowers/plans/2026-07-13-api-v1-runtime-cutover-implementation.md`.
+> Companion production runtime and manual pairing now use TCP `9810`; legacy
+> `PiConnection`/`Protocol` code has been deleted. Historical inventory and
+> verification evidence below are intentionally preserved.
+
 ## Goal
 
 Begin migrating OpenAuto Companion from the legacy JSON/HMAC socket on TCP

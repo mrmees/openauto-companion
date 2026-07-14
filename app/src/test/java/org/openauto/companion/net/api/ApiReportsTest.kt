@@ -3,6 +3,7 @@ package org.openauto.companion.net.api
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import prodigy.api.v1.Api
 
@@ -31,6 +32,13 @@ class ApiReportsTest {
 
         assertFalse(missing.timeReport.hasTimezoneId())
         assertFalse(blank.timeReport.hasTimezoneId())
+    }
+
+    @Test
+    fun timeReport_rejectsNonpositiveUnixTime() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ApiReports.timeReport(unixTimeMs = 0)
+        }
     }
 
     @Test
@@ -68,6 +76,39 @@ class ApiReportsTest {
     }
 
     @Test
+    fun gpsReport_rejectsMalformedCoordinatesAndMotionFields() {
+        fun valid(
+            latitude: Double = 41.881,
+            longitude: Double = -87.623,
+            speedMps: Double = 1.0,
+            bearingDeg: Double = 90.0,
+            accuracyM: Double = 2.0,
+            altitudeM: Double? = null
+        ) = ApiReports.gpsReport(
+            latitude = latitude,
+            longitude = longitude,
+            speedMps = speedMps,
+            bearingDeg = bearingDeg,
+            accuracyM = accuracyM,
+            ageMs = 0,
+            altitudeM = altitudeM
+        )
+
+        listOf<() -> Unit>(
+            { valid(latitude = Double.NaN) },
+            { valid(latitude = 91.0) },
+            { valid(longitude = -181.0) },
+            { valid(speedMps = -1.0) },
+            { valid(speedMps = Double.POSITIVE_INFINITY) },
+            { valid(bearingDeg = 360.0) },
+            { valid(accuracyM = -0.1) },
+            { valid(altitudeM = Double.NaN) }
+        ).forEach { call ->
+            assertThrows(IllegalArgumentException::class.java) { call() }
+        }
+    }
+
+    @Test
     fun connectivityReport_setsSocksPasswordOnlyWhenSupplied() {
         val withPassword = ApiReports.connectivityReport(
             internetAvailable = true,
@@ -91,5 +132,23 @@ class ApiReportsTest {
         assertEquals("pass-1234", withPassword.connectivityReport.socks5Password)
 
         assertFalse(withoutPassword.connectivityReport.hasSocks5Password())
+    }
+
+    @Test
+    fun connectivityReport_enforcesActiveAndInactivePortShape() {
+        assertThrows(IllegalArgumentException::class.java) {
+            ApiReports.connectivityReport(true, socks5Active = true, socks5Port = 0)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ApiReports.connectivityReport(false, socks5Active = false, socks5Port = 1080)
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            ApiReports.connectivityReport(
+                internetAvailable = false,
+                socks5Active = false,
+                socks5Port = 0,
+                socks5Password = "should-not-be-sent"
+            )
+        }
     }
 }

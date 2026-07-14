@@ -2,6 +2,7 @@ package org.openauto.companion.net.api
 
 import com.google.protobuf.ByteString
 import prodigy.api.v1.Api
+import prodigy.api.v1.Common
 
 class ApiHandshake private constructor(
     private val clientName: String,
@@ -20,7 +21,10 @@ class ApiHandshake private constructor(
             val serverHello: Api.ServerHello,
             val pairedCredentials: PairedCredentials? = null
         ) : Result()
-        data class Terminal(val reason: String) : Result()
+        data class Terminal(
+            val reason: String,
+            val errorCode: Common.ErrorCode? = null
+        ) : Result()
     }
 
     data class PairedCredentials(
@@ -47,7 +51,7 @@ class ApiHandshake private constructor(
         }
 
         return Api.ApiMessage.newBuilder()
-            .setRequestId(0)
+            .setRequestId(HANDSHAKE_REQUEST_ID)
             .setClientHello(
                 Api.ClientHello.newBuilder()
                     .setRequestedApiVersionMajor(1)
@@ -70,7 +74,10 @@ class ApiHandshake private constructor(
             Api.ApiMessage.PayloadCase.PAIRING_CHALLENGE -> handlePairingChallenge(message.pairingChallenge)
             Api.ApiMessage.PayloadCase.SERVER_HELLO -> handleServerHello(message.serverHello)
             Api.ApiMessage.PayloadCase.AUTH_REJECT -> terminal(message.authReject.reason)
-            Api.ApiMessage.PayloadCase.ERROR -> terminal(message.error.message)
+            Api.ApiMessage.PayloadCase.ERROR -> terminal(
+                reason = message.error.message,
+                errorCode = message.error.code
+            )
             else -> terminal("Unexpected handshake message: ${message.payloadCase}")
         }
     }
@@ -85,7 +92,7 @@ class ApiHandshake private constructor(
         val proof = ApiCrypto.hmacSha256(known.secret, authRequired.nonce.toByteArray())
         return Result.Send(
             Api.ApiMessage.newBuilder()
-                .setRequestId(0)
+                .setRequestId(HANDSHAKE_REQUEST_ID)
                 .setAuthResponse(
                     Api.AuthResponse.newBuilder()
                         .setClientId(known.clientId)
@@ -104,7 +111,7 @@ class ApiHandshake private constructor(
         val proof = ApiCrypto.hmacSha256(secret, challenge.nonce.toByteArray())
         return Result.Send(
             Api.ApiMessage.newBuilder()
-                .setRequestId(0)
+                .setRequestId(HANDSHAKE_REQUEST_ID)
                 .setPairingResponse(
                     Api.PairingResponse.newBuilder()
                         .setProof(ByteString.copyFrom(proof))
@@ -128,9 +135,12 @@ class ApiHandshake private constructor(
         return Result.Ready(serverHello = serverHello, pairedCredentials = paired)
     }
 
-    private fun terminal(reason: String): Result.Terminal {
+    private fun terminal(
+        reason: String,
+        errorCode: Common.ErrorCode? = null
+    ): Result.Terminal {
         state = State.TERMINAL
-        return Result.Terminal(reason)
+        return Result.Terminal(reason = reason, errorCode = errorCode)
     }
 
     private sealed class Credentials {
@@ -139,6 +149,8 @@ class ApiHandshake private constructor(
     }
 
     companion object {
+        private const val HANDSHAKE_REQUEST_ID = 1L
+
         fun knownClient(clientName: String, clientId: String, secret: ByteArray): ApiHandshake {
             require(clientId.isNotBlank()) { "clientId is required" }
             require(secret.size == ApiCrypto.SECRET_SIZE_BYTES) { "secret must be 32 bytes" }

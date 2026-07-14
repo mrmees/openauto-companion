@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -18,14 +19,20 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.runtime.*
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import org.openauto.companion.CompanionApp
 import org.openauto.companion.data.CompanionPrefs
 import org.openauto.companion.data.Vehicle
+import org.openauto.companion.net.NetworkSocketFactory
 import org.openauto.companion.net.SettingsUrlBuilder
 import org.openauto.companion.net.ThemeTransfer
+import org.openauto.companion.net.WifiNetworkResolver
+import org.openauto.companion.net.api.ApiPairingCoordinator
+import org.openauto.companion.net.api.ApiPairingCredentialStore
+import org.openauto.companion.net.api.ApiPairingDraft
 import org.openauto.companion.service.CompanionService
 import org.openauto.companion.service.VehicleIdentity
-import java.security.MessageDigest
 
 class MainActivity : ComponentActivity() {
     private lateinit var prefs: CompanionPrefs
@@ -56,20 +63,52 @@ class MainActivity : ComponentActivity() {
                 val isAudioKeepAliveActive by CompanionService.audioKeepAliveActive.collectAsStateWithLifecycle()
                 val connectedVehicleName by CompanionService.vehicleName.collectAsStateWithLifecycle()
                 val connectedVehicleId by CompanionService.vehicleId.collectAsStateWithLifecycle()
+                val connectionIssue by CompanionService.connectionIssue.collectAsStateWithLifecycle()
 
                 var showPairingSuccess by remember { mutableStateOf<String?>(null) }
-                var pairingError by remember { mutableStateOf<String?>(null) }
+                var pairingState by remember { mutableStateOf<PairingUiState>(PairingUiState.Idle) }
 
-                fun handlePairing(vehicle: Vehicle, displayName: String) {
-                    if (!prefs.addVehicle(vehicle)) {
-                        pairingError = "Vehicle \"$displayName\" is already paired."
-                        return
+                val startPairing: (ApiPairingDraft, String) -> Unit = start@{ draft, pin ->
+                    if (pairingState is PairingUiState.Pairing) return@start
+                    pairingState = PairingUiState.Pairing
+                    lifecycleScope.launch {
+                        val credentialStore = ApiPairingCredentialStore(
+                            loadVehicles = { prefs.vehicles },
+                            saveVehicles = { prefs.vehicles = it }
+                        )
+                        val networkResolver = WifiNetworkResolver(this@MainActivity)
+                        val coordinator = ApiPairingCoordinator(
+                            credentialStore = credentialStore,
+                            resolveSocketFactory = { targetSsid, targetHost ->
+                                networkResolver.resolve(targetSsid, targetHost)?.let { network ->
+                                    NetworkSocketFactory.forNetwork(
+                                        network,
+                                        onFallback = {
+                                            Log.w(
+                                                TAG,
+                                                "Wi-Fi-bound pairing socket was denied; retrying API v1 TCP unbound"
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        )
+                        when (val result = coordinator.pair(draft, pin = pin)) {
+                            is ApiPairingCoordinator.Result.Success -> {
+                                vehicles = prefs.vehicles
+                                restartMonitoring()
+                                pairingState = PairingUiState.Idle
+                                screen = Screen.VehicleList
+                                showPairingSuccess = result.vehicle.name
+                            }
+                            is ApiPairingCoordinator.Result.Failure -> {
+                                pairingState = PairingUiState.Failed(result.message)
+                            }
+                            ApiPairingCoordinator.Result.Cancelled -> {
+                                pairingState = PairingUiState.Idle
+                            }
+                        }
                     }
-
-                    vehicles = prefs.vehicles
-                    restartMonitoring()
-                    screen = Screen.VehicleList
-                    showPairingSuccess = displayName
                 }
 
                 val connectedVehicle = if (isConnected) {
@@ -98,26 +137,16 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                pairingError?.let { message ->
-                    AlertDialog(
-                        onDismissRequest = { pairingError = null },
-                        title = { Text("Pairing Skipped") },
-                        text = { Text(message) },
-                        confirmButton = {
-                            TextButton(onClick = { pairingError = null }) {
-                                Text("OK")
-                            }
-                        }
-                    )
-                }
-
                 when (val s = screen) {
                     is Screen.VehicleList -> {
                         VehicleListScreen(
                             vehicles = vehicles,
                             connectedSsid = connectedSsid,
                             onVehicleTap = { screen = Screen.Status(it) },
-                            onAddVehicle = { screen = Screen.Pairing },
+                            onAddVehicle = {
+                                pairingState = PairingUiState.Idle
+                                screen = Screen.Pairing
+                            },
                             onRemoveVehicle = { vehicle ->
                                 prefs.removeVehicle(vehicle.id)
                                 vehicles = prefs.vehicles
@@ -126,45 +155,43 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     is Screen.Pairing -> {
-                        if (vehicles.isNotEmpty()) {
-                            BackHandler { screen = Screen.VehicleList }
+                        BackHandler(enabled = vehicles.isNotEmpty()) {
+                            if (pairingState !is PairingUiState.Pairing) {
+                                pairingState = PairingUiState.Idle
+                                screen = Screen.VehicleList
+                            }
                         }
                         PairingScreen(
-                            onPaired = { ssid, name, pin ->
-                                val secret = deriveSecret(pin)
-                                val vehicle = Vehicle(ssid = ssid, name = name, sharedSecret = secret)
-                                handlePairing(vehicle, name)
+                            state = pairingState,
+                            onPair = { ssid, name, pin ->
+                                startPairing(
+                                    ApiPairingDraft(ssid = ssid, displayName = name),
+                                    pin
+                                )
                             },
+                            onScanQr = { screen = Screen.QrScan },
                             onCancel = if (vehicles.isNotEmpty()) {
-                                { screen = Screen.VehicleList }
+                                {
+                                    pairingState = PairingUiState.Idle
+                                    screen = Screen.VehicleList
+                                }
                             } else null,
-                            onScanQr = { screen = Screen.QrScan }
                         )
                     }
                     is Screen.QrScan -> {
                         BackHandler { screen = Screen.Pairing }
                         QrScanScreen(
-                            onScanned = { ssid, pin, vehicleId, host, port ->
-                                val secret = deriveSecret(pin)
-                                val vehicle = if (vehicleId == null) {
-                                    Vehicle(
-                                        ssid = ssid,
-                                        name = ssid,
-                                        sharedSecret = secret,
-                                        settingsHost = host,
-                                        settingsPort = port
-                                    )
-                                } else {
-                                    Vehicle(
-                                        id = vehicleId,
-                                        ssid = ssid,
-                                        name = ssid,
-                                        sharedSecret = secret,
-                                        settingsHost = host,
-                                        settingsPort = port
-                                    )
-                                }
-                                handlePairing(vehicle, ssid)
+                            onScanned = { payload ->
+                                screen = Screen.Pairing
+                                startPairing(
+                                    ApiPairingDraft(
+                                        ssid = payload.ssid,
+                                        displayName = payload.ssid,
+                                        host = payload.host,
+                                        tcpPort = payload.tcpPort
+                                    ),
+                                    payload.pin
+                                )
                             },
                             onCancel = { screen = Screen.Pairing }
                         )
@@ -172,10 +199,16 @@ class MainActivity : ComponentActivity() {
                     is Screen.Status -> {
                         BackHandler { screen = Screen.VehicleList }
                         val vehicle = s.vehicle
-                        val isThisConnected = isConnected &&
-                            VehicleIdentity.matches(vehicle.id, vehicle.ssid, connectedVehicleId)
+                        val isThisRuntime = VehicleIdentity.matches(
+                            vehicle.id,
+                            vehicle.ssid,
+                            connectedVehicleId
+                        )
+                        val isThisConnected = isConnected && isThisRuntime
                         val status = CompanionStatus(
                             connected = isThisConnected,
+                            headUnitAvailable = isThisRuntime,
+                            connectionMessage = connectionIssue.takeIf { isThisRuntime },
                             sharingTime = true,
                             sharingGps = true,
                             sharingBattery = true,
@@ -197,6 +230,7 @@ class MainActivity : ComponentActivity() {
                             onSocks5Toggle = {
                                 socks5Enabled = it
                                 prefs.updateVehicle(vehicle.id) { v -> v.copy(socks5Enabled = it) }
+                                CompanionService.setInternetSharingStatic(vehicle.id, it)
                             },
                             audioKeepAlive = audioKeepAlive,
                             onAudioKeepAliveToggle = {
@@ -277,12 +311,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun deriveSecret(pin: String): String {
-        val material = "$pin:openauto-companion-v1"
-        val digest = MessageDigest.getInstance("SHA-256")
-        return digest.digest(material.toByteArray()).joinToString("") { "%02x".format(it) }
-    }
-
     private fun startMonitoringIfPaired() {
         if (prefs.isPaired) {
             (application as CompanionApp).startWifiMonitor(prefs.vehicles)
@@ -292,10 +320,17 @@ class MainActivity : ComponentActivity() {
     private fun restartMonitoring() {
         val app = application as CompanionApp
         if (prefs.isPaired) {
+            // Pairing/unpairing and vehicle-list changes are intentional runtime
+            // refreshes, unlike the quiet monitor replacement during onCreate().
+            app.stopWifiMonitor()
             app.startWifiMonitor(prefs.vehicles)
         } else {
             app.stopWifiMonitor()
         }
+    }
+
+    private companion object {
+        const val TAG = "MainActivity"
     }
 }
 

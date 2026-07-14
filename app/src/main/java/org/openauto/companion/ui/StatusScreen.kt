@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 
 data class CompanionStatus(
     val connected: Boolean = false,
+    val headUnitAvailable: Boolean = false,
+    val connectionMessage: String? = null,
     val sharingTime: Boolean = false,
     val sharingGps: Boolean = false,
     val sharingBattery: Boolean = false,
@@ -60,7 +62,13 @@ fun StatusScreen(
                     modifier = Modifier.size(12.dp)
                 ) {}
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(if (status.connected) "Connected" else "Waiting for ${status.ssid}...")
+                Text(
+                    if (status.connected) {
+                        "Connected"
+                    } else {
+                        status.connectionMessage ?: "Waiting for ${status.ssid}..."
+                    }
+                )
             }
         }
 
@@ -68,7 +76,7 @@ fun StatusScreen(
 
         Button(
             onClick = onOpenSettingsPage,
-            enabled = status.connected,
+            enabled = status.headUnitAvailable,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Open Settings Page")
@@ -78,7 +86,7 @@ fun StatusScreen(
 
         Button(
             onClick = onOpenThemeBuilder,
-            enabled = status.connected,
+            enabled = status.headUnitAvailable,
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("Theme Builder")
