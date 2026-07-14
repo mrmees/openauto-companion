@@ -5,11 +5,11 @@ import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 data class PairingPayload(
-    val ssid: String,
+    val host: String,
+    val tcpPort: Int,
+    val webSocketPort: Int,
     val pin: String,
-    val vehicleId: String?,
-    val host: String?,
-    val port: Int?
+    val ssid: String
 )
 
 object PairingUriParser {
@@ -20,33 +20,30 @@ object PairingUriParser {
             return null
         }
 
-        if (uri.scheme != "openauto" || uri.host != "pair") return null
+        if (uri.scheme != "prodigy" || uri.host != "pair") return null
 
-        val params = parseQuery(uri.rawQuery ?: return null)
-        val pin = params["pin"]?.trim()
-        val ssid = params["ssid"]?.trim()
-
-        if (pin.isNullOrEmpty() || !pin.matches(Regex("\\d{6}"))) return null
-        if (ssid.isNullOrEmpty()) return null
-
-        val vehicleId = params["vehicle_id"]?.trim()?.ifBlank { null }
-            ?: params["id"]?.trim()?.ifBlank { null }
-
-        val host = params["host"]?.trim()?.ifBlank { null }
-        val portRaw = params["port"]?.trim()
-        val port = when {
-            portRaw.isNullOrBlank() -> null
-            else -> portRaw.toIntOrNull()?.takeIf { it in 1..65535 } ?: return null
+        val params = try {
+            parseQuery(uri.rawQuery ?: return null)
+        } catch (_: IllegalArgumentException) {
+            return null
         }
+        val host = params["host"]?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val tcpPort = parsePort(params["tcp"]) ?: return null
+        val webSocketPort = parsePort(params["ws"]) ?: return null
+        val pin = params["pin"]?.trim()?.takeIf { it.matches(PIN_PATTERN) } ?: return null
+        val ssid = params["ssid"]?.trim()?.takeIf { it.isNotBlank() } ?: return null
 
         return PairingPayload(
-            ssid = ssid,
-            pin = pin,
-            vehicleId = vehicleId,
             host = host,
-            port = port
+            tcpPort = tcpPort,
+            webSocketPort = webSocketPort,
+            pin = pin,
+            ssid = ssid
         )
     }
+
+    private fun parsePort(raw: String?): Int? =
+        raw?.trim()?.toIntOrNull()?.takeIf { it in 1..65535 }
 
     private fun parseQuery(query: String): Map<String, String> {
         if (query.isBlank()) return emptyMap()
@@ -63,4 +60,6 @@ object PairingUriParser {
 
     private fun decode(value: String): String =
         URLDecoder.decode(value, StandardCharsets.UTF_8.toString())
+
+    private val PIN_PATTERN = Regex("[0-9]{6}")
 }

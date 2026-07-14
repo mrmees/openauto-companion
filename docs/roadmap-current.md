@@ -11,6 +11,13 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
   - Prodigy ran with `companion.enabled: false`; TCP `9876` was absent and the
     guarded phone-side refusal probe passed. Android Auto's established `5277`
     session remained up through Companion toggle, force-stop, and reconnect.
+- API v1 QR pairing — completed and live-validated 2026-07-13.
+  - The Pixel scanned the QR rendered on Prodigy's External API page and
+    reached READY without manual input; the advertised endpoint and credentials
+    persisted, and saved-client reconnect passed after force-stop/relaunch.
+  - With no pairing window open, Companion received the deployed typed code `5`
+    response and showed the specific retryable pairing-window-closed message.
+    This passed after Prodigy fixed real-socket terminal-frame flushing.
 
 ## Now
 

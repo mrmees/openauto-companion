@@ -20,6 +20,7 @@ fun PairingScreen(
     suggestedSsid: String = "",
     state: PairingUiState,
     onPair: (ssid: String, name: String, pin: String) -> Unit,
+    onScanQr: () -> Unit,
     onCancel: (() -> Unit)? = null
 ) {
     var ssid by remember { mutableStateOf(suggestedSsid) }
@@ -36,8 +37,24 @@ fun PairingScreen(
     ) {
         Text("Add Vehicle", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Enter the WiFi SSID and 6-digit PIN shown on your head unit's settings screen.")
-        Spacer(modifier = Modifier.height(32.dp))
+        Text("Scan the QR code on your head unit, or enter its WiFi details and PIN manually.")
+        Spacer(modifier = Modifier.height(20.dp))
+
+        FilledTonalButton(
+            onClick = onScanQr,
+            enabled = !pairing,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Scan QR")
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            "Manual pairing",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = ssid,

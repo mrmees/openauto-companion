@@ -714,3 +714,153 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
     active transitions with no error
   - AA stream continuity: PASS by stable established TCP `5277` session across
     Companion lifecycle and bridge operations
+
+## 2026-07-13 21:02 (local)
+
+- What changed:
+  - Activated the existing CameraX/ML Kit scanner from the pairing screen while
+    retaining manual SSID/name/PIN entry.
+  - Replaced the dormant legacy QR parser with defensive parsing for the
+    approved additive `prodigy://pair` contract: required host, TCP/WebSocket
+    ports, six-digit PIN, and percent-decoded SSID; unknown fields are ignored.
+  - Routed valid scans through the existing live API v1 challenge/response
+    coordinator without changing credential derivation or persistence timing.
+  - Added persisted `api_tcp_port` with a backward-compatible `9810` default
+    and carried it through pairing, Wi-Fi monitor service startup, and runtime
+    reconnects.
+  - Preserved structured External API error codes through the handshake/session
+    seam and added a clean retryable pairing-window-closed UI result, with an
+    `AuthReject` reason fallback for compatibility.
+  - Removed raw QR/PIN logs, made scanner completion single-shot, surfaced
+    camera startup errors, and unbound camera resources on exit.
+  - Added the QR design/implementation artifacts and updated vision/roadmap
+    alignment. Logged the Prodigy SSID/terminal-frame dependency as In Progress.
+- Why:
+  - Deliver zero-input API v1 pairing against the newly shipped head-unit QR
+    while keeping manual pairing reliable and ensuring advertised live TCP
+    endpoints also work after reconnect.
+- Status: Companion implementation complete; coordinated live bench pending the
+  updated Prodigy QR build and confirmed closed-window terminal frame.
+- Dependency decision:
+  - Companion-only: No
+  - Head-unit reference: External API v1 QR pairing SSID and terminal expiry
+    contract (`docs/project-vision.md`, In Progress).
+- Next steps:
+  - 1) Deploy the Prodigy build that adds percent-encoded `ssid` to the QR and
+    report its exact closed-window protobuf frame.
+  - 2) Install the Companion debug APK on the attached Pixel and bench
+    scan-to-READY plus saved-client reconnect/report flow.
+  - 3) Repeat after the 120-second window expires, then mark the dependency and
+    implementation plan complete if the clean error and manual fallback pass.
+- Verification:
+  - Focused QR/pairing/storage/handshake/session unit suite -> PASS.
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS (`BUILD SUCCESSFUL`).
+  - `./gradlew :app:assembleDebugAndroidTest` -> PASS (`BUILD SUCCESSFUL`).
+  - Structural log scan -> PASS; no raw QR value or PIN logging remains.
+  - `/mnt/e/Android/Sdk/platform-tools/adb.exe devices` -> Pixel
+    `39260DLJH000LX` attached.
+  - AA stream continuity: not tested; no APK was installed and no live runtime
+    was changed during this implementation session.
+
+## 2026-07-13 21:36 (local)
+
+- What changed:
+  - Installed the QR-pairing build on the attached Pixel and completed a
+    physical scan of the Prodigy bench QR with no manual entry.
+  - Verified that the advertised SSID, live TCP port, API host, and resulting
+    credentials were persisted; force-stop/relaunch reconnected as a saved
+    client without reopening a pairing window.
+  - Changed handshake messages to use the protocol-required nonzero request ID
+    (`1`) after the first closed-window probe exposed the prior zero value.
+  - Added an exact codec regression for the documented 29-byte
+    `ERROR_CODE_PAIRING_WINDOW_CLOSED` payload and its four-byte TCP length
+    prefix.
+  - Updated the QR plan and project dependency status to distinguish completed
+    Companion behavior from the remaining Prodigy live terminal-frame issue.
+- Why:
+  - Close the physical zero-input pairing acceptance criteria and determine
+    whether the documented closed/expired-window behavior is actually present
+    on the deployed remote TCP path.
+- Status: partial. Companion QR pairing and saved-client reconnect pass. The
+  closed-window acceptance criterion is blocked by the deployed Prodigy TCP
+  path closing before the promised typed error frame is received.
+- Live results:
+  - Head-unit QR -> Companion scan -> READY succeeded without typing an SSID,
+    endpoint, or PIN.
+  - The saved vehicle contains `Prodigy_e57d`, API host `10.0.0.1`, and TCP port
+    `9810`; credential presence was verified without exposing credential
+    values.
+  - Force-stop/relaunch returned the vehicle to Connected without a new pairing
+    window. The final phone state was Connected with Time and GPS reports
+    active.
+  - A no-window attempt using the original request ID `0` ended at EOF before
+    the four-byte TCP prefix. After correcting Companion to use request ID `1`,
+    the same live attempt again ended at EOF before any terminal frame.
+  - Companion's transport regression receives a terminal frame written,
+    flushed, and immediately followed by close, so the remaining mismatch is
+    in the deployed Prodigy remote-socket delivery path rather than the
+    Companion decoder or close handling.
+- Next steps:
+  - 1) Have the Prodigy maintainer inspect and fix the deployed remote TCP
+    terminal-frame write/flush path, then redeploy it to the bench Pi.
+  - 2) Repeat never-opened and expired-window attempts and verify code `5`,
+    message `Pairing window closed`, request-ID echo, and clean close.
+  - 3) Confirm head-unit-side report reception and, if required for the release
+    gate, Android Auto continuity during the final rerun; then mark the QR plan
+    and dependency complete.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest`
+    -> PASS (`BUILD SUCCESSFUL`).
+  - Exact protobuf payload/prefix regression -> PASS.
+  - Debug APK install on Pixel `39260DLJH000LX` -> PASS.
+  - Physical QR scan-to-READY -> PASS; no manual input.
+  - Saved-client reconnect after force-stop/relaunch -> PASS.
+  - Closed-window typed error against deployed Prodigy TCP -> FAIL/BLOCKED;
+    EOF occurred before the length prefix for request IDs `0` and `1`.
+  - AA stream continuity: not specifically tested in this QR bench session.
+
+## 2026-07-13 22:13 (local)
+
+- What changed:
+  - Re-ran the closed-window Companion path against Prodigy's deployed
+    real-socket flush fix (`707be98`, `829f247`; pushed through `6c89903`).
+  - Reopened the pairing window through the local trusted External API,
+    navigated the head unit to its External API page, and completed a fresh
+    physical scan of the QR rendered there.
+  - Marked the QR pairing plan, roadmap item, SSID/expiry dependency, and
+    terminal-frame delivery dependency complete.
+- Why:
+  - Verify the previously failing production-lifetime TCP path on the same
+    Pixel/Prodigy bench and close the final QR acceptance criteria.
+- Status: complete. Both the typed closed-window path and zero-input physical
+  QR pairing pass against the fixed deployed Prodigy service.
+- Live results:
+  - With no window open, Companion received typed code `5` and displayed
+    `Pairing window closed. Start a new pairing window and scan again.` No
+    vehicle or credentials were persisted for the rejected attempt.
+  - The Prodigy External API page visibly rendered its active-window PIN and
+    QR. Companion's already-open camera recognized that physical QR, completed
+    pairing, and showed `Pairing Successful`; the server closed the window.
+  - The saved vehicle persisted `Prodigy_e57d`, host `10.0.0.1`, and TCP port
+    `9810`, with credential presence verified without logging their values.
+  - Force-stop/relaunch reconnected as a saved client without a new window.
+    Final Companion state is Connected with Time, GPS, Battery, and SOCKS5 all
+    Active.
+  - Prodigy route state changed to disabled on Companion force-stop and active
+    again after relaunch/reconnect.
+- Next steps:
+  - 1) Treat API v1 QR pairing as complete and include the Companion changes in
+    the normal review/commit workflow.
+  - 2) Continue the existing deterministic Pi desktop/system routing priority.
+  - 3) Run a dedicated AA-continuity observation only if that separate release
+    criterion still requires a QR-specific repetition.
+- Verification:
+  - Deployed no-window attempt -> PASS; specific typed-error UI observed.
+  - Physical head-unit QR scan-to-READY -> PASS; no manual pairing input.
+  - Persisted endpoint/credential-presence check -> PASS.
+  - Saved-client reconnect after force-stop/relaunch -> PASS.
+  - Final Companion status -> Connected; Time/GPS/Battery/SOCKS5 Active.
+  - Prodigy route teardown/replay journal evidence -> PASS.
+  - Previous full Gradle gate remains PASS; no Companion code changed during
+    this rerun.
+  - AA stream continuity: not specifically observed during this final rerun.

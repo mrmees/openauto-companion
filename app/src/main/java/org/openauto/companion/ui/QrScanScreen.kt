@@ -27,13 +27,16 @@ import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
 import android.util.Size
 import org.openauto.companion.net.PairingUriParser
+import org.openauto.companion.net.PairingPayload
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 private const val TAG = "QrScanScreen"
 
 @Composable
 fun QrScanScreen(
-    onScanned: (ssid: String, pin: String, vehicleId: String?, host: String?, port: Int?) -> Unit,
+    onScanned: (PairingPayload) -> Unit,
     onCancel: () -> Unit
 ) {
     val context = LocalContext.current
@@ -44,6 +47,7 @@ fun QrScanScreen(
         )
     }
     var permissionDenied by remember { mutableStateOf(false) }
+    var cameraError by remember { mutableStateOf<String?>(null) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -77,11 +81,20 @@ fun QrScanScreen(
 
                 CameraPreviewWithScanner(
                     onScanned = onScanned,
+                    onCameraError = { cameraError = it },
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
                         .padding(16.dp)
                 )
+
+                cameraError?.let { message ->
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
 
                 TextButton(
                     onClick = onCancel,
@@ -115,12 +128,15 @@ fun QrScanScreen(
 
 @Composable
 private fun CameraPreviewWithScanner(
-    onScanned: (ssid: String, pin: String, vehicleId: String?, host: String?, port: Int?) -> Unit,
+    onScanned: (PairingPayload) -> Unit,
+    onCameraError: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    var scanComplete by remember { mutableStateOf(false) }
+    val scanComplete = remember { AtomicBoolean(false) }
+    val disposed = remember { AtomicBoolean(false) }
+    val cameraProvider = remember { AtomicReference<ProcessCameraProvider?>() }
 
     val options = remember {
         BarcodeScannerOptions.Builder()
@@ -132,6 +148,8 @@ private fun CameraPreviewWithScanner(
 
     DisposableEffect(Unit) {
         onDispose {
+            disposed.set(true)
+            cameraProvider.get()?.unbindAll()
             scanner.close()
             analysisExecutor.shutdown()
         }
@@ -143,7 +161,18 @@ private fun CameraPreviewWithScanner(
             val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
 
             cameraProviderFuture.addListener({
-                val cameraProvider = cameraProviderFuture.get()
+                val provider = try {
+                    cameraProviderFuture.get()
+                } catch (error: Exception) {
+                    Log.e(TAG, "Camera provider failed", error)
+                    onCameraError("Unable to start the camera.")
+                    return@addListener
+                }
+                cameraProvider.set(provider)
+                if (disposed.get()) {
+                    provider.unbindAll()
+                    return@addListener
+                }
 
                 val preview = Preview.Builder().build().also {
                     it.surfaceProvider = previewView.surfaceProvider
@@ -155,21 +184,20 @@ private fun CameraPreviewWithScanner(
                     .build()
 
                 imageAnalysis.setAnalyzer(analysisExecutor) { imageProxy ->
-                    if (scanComplete) {
+                    if (scanComplete.get()) {
                         imageProxy.close()
                         return@setAnalyzer
                     }
-                    processFrame(imageProxy, scanner) { ssid, pin, vehicleId, host, port ->
-                        if (!scanComplete) {
-                            scanComplete = true
-                            onScanned(ssid, pin, vehicleId, host, port)
+                    processFrame(imageProxy, scanner) { payload ->
+                        if (scanComplete.compareAndSet(false, true)) {
+                            onScanned(payload)
                         }
                     }
                 }
 
                 try {
-                    cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(
+                    provider.unbindAll()
+                    provider.bindToLifecycle(
                         lifecycleOwner,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         preview,
@@ -177,6 +205,7 @@ private fun CameraPreviewWithScanner(
                     )
                 } catch (e: Exception) {
                     Log.e(TAG, "Camera bind failed", e)
+                    onCameraError("Unable to start the camera.")
                 }
             }, ContextCompat.getMainExecutor(ctx))
 
@@ -192,7 +221,7 @@ private var frameCount = 0L
 private fun processFrame(
     imageProxy: ImageProxy,
     scanner: com.google.mlkit.vision.barcode.BarcodeScanner,
-    onResult: (ssid: String, pin: String, vehicleId: String?, host: String?, port: Int?) -> Unit
+    onResult: (PairingPayload) -> Unit
 ) {
     val mediaImage = imageProxy.image
     if (mediaImage == null) {
@@ -215,15 +244,14 @@ private fun processFrame(
             }
             for (barcode in barcodes) {
                 val rawValue = barcode.rawValue
-                Log.i(TAG, "Barcode raw: $rawValue format=${barcode.format} type=${barcode.valueType}")
                 if (rawValue == null) continue
                 val payload = PairingUriParser.parse(rawValue)
                 if (payload != null) {
-                    Log.i(TAG, "QR scanned: ssid=${payload.ssid}")
-                    onResult(payload.ssid, payload.pin, payload.vehicleId, payload.host, payload.port)
+                    Log.i(TAG, "Valid Prodigy pairing QR scanned")
+                    onResult(payload)
                     break
                 }
-                Log.w(TAG, "QR payload invalid: $rawValue")
+                Log.w(TAG, "Ignoring QR code that is not a valid Prodigy pairing payload")
             }
         }
         .addOnFailureListener { e ->

@@ -121,6 +121,9 @@ class CompanionService : Service() {
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?: ApiTcpTransport.DEFAULT_HOST
+        val tcpPort = intent?.getIntExtra(EXTRA_API_TCP_PORT, ApiTcpTransport.DEFAULT_PORT)
+            ?.takeIf { it in 1..65535 }
+            ?: return null
         val wifiNetwork = (application as CompanionApp).wifiMonitor?.getWifiNetwork()
             ?: return null
         return RuntimeConfig(
@@ -135,6 +138,7 @@ class CompanionService : Service() {
                 ?.trim()
                 ?.takeIf { it.isNotBlank() },
             host = host,
+            tcpPort = tcpPort,
             wifiNetwork = wifiNetwork,
             socks5Enabled = intent?.getBooleanExtra(EXTRA_SOCKS5_ENABLED, true) ?: true,
             audioKeepAlive = intent?.getBooleanExtra(EXTRA_AUDIO_KEEP_ALIVE, false) ?: false
@@ -186,7 +190,7 @@ class CompanionService : Service() {
                     ApiSessionClient(
                         transport = ApiTcpTransport(
                             host = config.host,
-                            port = ApiTcpTransport.DEFAULT_PORT,
+                            port = config.tcpPort,
                             socketFactory = NetworkSocketFactory.forNetwork(
                                 config.wifiNetwork,
                                 onFallback = {
@@ -617,6 +621,7 @@ class CompanionService : Service() {
         val apiSecret: ByteArray,
         val serverId: String?,
         val host: String,
+        val tcpPort: Int,
         val wifiNetwork: Network,
         val socks5Enabled: Boolean,
         val audioKeepAlive: Boolean
@@ -638,6 +643,7 @@ class CompanionService : Service() {
         const val EXTRA_API_SECRET_HEX = "api_secret_hex"
         const val EXTRA_SERVER_ID = "server_id"
         const val EXTRA_HEAD_UNIT_HOST = "head_unit_host"
+        const val EXTRA_API_TCP_PORT = "api_tcp_port"
         const val EXTRA_SOCKS5_ENABLED = "socks5_enabled"
         const val EXTRA_AUDIO_KEEP_ALIVE = "audio_keep_alive"
 

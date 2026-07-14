@@ -31,7 +31,6 @@ import org.openauto.companion.net.WifiNetworkResolver
 import org.openauto.companion.net.api.ApiPairingCoordinator
 import org.openauto.companion.net.api.ApiPairingCredentialStore
 import org.openauto.companion.net.api.ApiPairingDraft
-import org.openauto.companion.net.api.ApiTcpTransport
 import org.openauto.companion.service.CompanionService
 import org.openauto.companion.service.VehicleIdentity
 
@@ -68,6 +67,49 @@ class MainActivity : ComponentActivity() {
 
                 var showPairingSuccess by remember { mutableStateOf<String?>(null) }
                 var pairingState by remember { mutableStateOf<PairingUiState>(PairingUiState.Idle) }
+
+                val startPairing: (ApiPairingDraft, String) -> Unit = start@{ draft, pin ->
+                    if (pairingState is PairingUiState.Pairing) return@start
+                    pairingState = PairingUiState.Pairing
+                    lifecycleScope.launch {
+                        val credentialStore = ApiPairingCredentialStore(
+                            loadVehicles = { prefs.vehicles },
+                            saveVehicles = { prefs.vehicles = it }
+                        )
+                        val networkResolver = WifiNetworkResolver(this@MainActivity)
+                        val coordinator = ApiPairingCoordinator(
+                            credentialStore = credentialStore,
+                            resolveSocketFactory = { targetSsid, targetHost ->
+                                networkResolver.resolve(targetSsid, targetHost)?.let { network ->
+                                    NetworkSocketFactory.forNetwork(
+                                        network,
+                                        onFallback = {
+                                            Log.w(
+                                                TAG,
+                                                "Wi-Fi-bound pairing socket was denied; retrying API v1 TCP unbound"
+                                            )
+                                        }
+                                    )
+                                }
+                            }
+                        )
+                        when (val result = coordinator.pair(draft, pin = pin)) {
+                            is ApiPairingCoordinator.Result.Success -> {
+                                vehicles = prefs.vehicles
+                                restartMonitoring()
+                                pairingState = PairingUiState.Idle
+                                screen = Screen.VehicleList
+                                showPairingSuccess = result.vehicle.name
+                            }
+                            is ApiPairingCoordinator.Result.Failure -> {
+                                pairingState = PairingUiState.Failed(result.message)
+                            }
+                            ApiPairingCoordinator.Result.Cancelled -> {
+                                pairingState = PairingUiState.Idle
+                            }
+                        }
+                    }
+                }
 
                 val connectedVehicle = if (isConnected) {
                     vehicles.find { it.id == connectedVehicleId || it.ssid == connectedVehicleId }
@@ -122,64 +164,36 @@ class MainActivity : ComponentActivity() {
                         PairingScreen(
                             state = pairingState,
                             onPair = { ssid, name, pin ->
-                                if (pairingState is PairingUiState.Pairing) return@PairingScreen
-                                pairingState = PairingUiState.Pairing
-                                lifecycleScope.launch {
-                                    val credentialStore = ApiPairingCredentialStore(
-                                        loadVehicles = { prefs.vehicles },
-                                        saveVehicles = { prefs.vehicles = it }
-                                    )
-                                    val networkResolver = WifiNetworkResolver(this@MainActivity)
-                                    val coordinator = ApiPairingCoordinator(
-                                        credentialStore = credentialStore,
-                                        resolveSocketFactory = { targetSsid ->
-                                            networkResolver.resolve(
-                                                targetSsid,
-                                                ApiTcpTransport.DEFAULT_HOST
-                                            )?.let { network ->
-                                                NetworkSocketFactory.forNetwork(
-                                                    network,
-                                                    onFallback = {
-                                                        Log.w(
-                                                            TAG,
-                                                            "Wi-Fi-bound pairing socket was denied; retrying API v1 TCP unbound"
-                                                        )
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    )
-                                    when (
-                                        val result = coordinator.pair(
-                                            ApiPairingDraft(
-                                                ssid = ssid,
-                                                displayName = name
-                                            ),
-                                            pin = pin
-                                        )
-                                    ) {
-                                        is ApiPairingCoordinator.Result.Success -> {
-                                            vehicles = prefs.vehicles
-                                            restartMonitoring()
-                                            pairingState = PairingUiState.Idle
-                                            screen = Screen.VehicleList
-                                            showPairingSuccess = result.vehicle.name
-                                        }
-                                        is ApiPairingCoordinator.Result.Failure -> {
-                                            pairingState = PairingUiState.Failed(result.message)
-                                        }
-                                        ApiPairingCoordinator.Result.Cancelled -> {
-                                            pairingState = PairingUiState.Idle
-                                        }
-                                    }
-                                }
+                                startPairing(
+                                    ApiPairingDraft(ssid = ssid, displayName = name),
+                                    pin
+                                )
                             },
+                            onScanQr = { screen = Screen.QrScan },
                             onCancel = if (vehicles.isNotEmpty()) {
                                 {
                                     pairingState = PairingUiState.Idle
                                     screen = Screen.VehicleList
                                 }
                             } else null,
+                        )
+                    }
+                    is Screen.QrScan -> {
+                        BackHandler { screen = Screen.Pairing }
+                        QrScanScreen(
+                            onScanned = { payload ->
+                                screen = Screen.Pairing
+                                startPairing(
+                                    ApiPairingDraft(
+                                        ssid = payload.ssid,
+                                        displayName = payload.ssid,
+                                        host = payload.host,
+                                        tcpPort = payload.tcpPort
+                                    ),
+                                    payload.pin
+                                )
+                            },
+                            onCancel = { screen = Screen.Pairing }
                         )
                     }
                     is Screen.Status -> {
@@ -320,6 +334,7 @@ class MainActivity : ComponentActivity() {
 private sealed class Screen {
     data object VehicleList : Screen()
     data object Pairing : Screen()
+    data object QrScan : Screen()
     data class Status(val vehicle: Vehicle) : Screen()
     data class ThemeBuilder(val vehicle: Vehicle) : Screen()
     data class WebConfig(val vehicle: Vehicle) : Screen()

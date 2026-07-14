@@ -6,56 +6,62 @@ import org.junit.Test
 
 class PairingUriParserTest {
     @Test
-    fun parse_validUriWithEndpointFields() {
+    fun parse_validProdigyUriWithRequiredFieldsAndUnknownAdditions() {
         val parsed = PairingUriParser.parse(
-            "openauto://pair?pin=123456&ssid=CarAP&host=10.0.0.1&port=8080"
+            "prodigy://pair?host=10.0.0.1&tcp=19810&ws=19811&pin=123456" +
+                "&ssid=OpenAutoProdigy-A3F2&future=value"
         )
+
         requireNotNull(parsed)
-        assertEquals("123456", parsed.pin)
-        assertEquals("CarAP", parsed.ssid)
         assertEquals("10.0.0.1", parsed.host)
-        assertEquals(8080, parsed.port)
-        assertNull(parsed.vehicleId)
+        assertEquals(19810, parsed.tcpPort)
+        assertEquals(19811, parsed.webSocketPort)
+        assertEquals("123456", parsed.pin)
+        assertEquals("OpenAutoProdigy-A3F2", parsed.ssid)
     }
 
     @Test
-    fun parse_acceptsVehicleId() {
+    fun parse_decodesPercentEncodedSsid() {
         val parsed = PairingUriParser.parse(
-            "openauto://pair?pin=123456&ssid=CarAP&vehicle_id=veh-001&host=10.0.0.1&port=8080"
+            "prodigy://pair?host=10.0.0.1&tcp=9810&ws=9811&pin=123456" +
+                "&ssid=My%20Car%20AP%2B5G%26more"
         )
+
         requireNotNull(parsed)
-        assertEquals("123456", parsed.pin)
-        assertEquals("CarAP", parsed.ssid)
-        assertEquals("veh-001", parsed.vehicleId)
+        assertEquals("My Car AP+5G&more", parsed.ssid)
     }
 
     @Test
-    fun parse_acceptsLegacyIdKey() {
-        val parsed = PairingUriParser.parse("openauto://pair?pin=123456&ssid=CarAP&id=legacy-009")
-        requireNotNull(parsed)
-        assertEquals("legacy-009", parsed.vehicleId)
+    fun parse_rejectsWrongSchemeOrAuthority() {
+        assertNull(
+            PairingUriParser.parse(
+                "openauto://pair?host=10.0.0.1&tcp=9810&ws=9811&pin=123456&ssid=Car"
+            )
+        )
+        assertNull(
+            PairingUriParser.parse(
+                "prodigy://wrong?host=10.0.0.1&tcp=9810&ws=9811&pin=123456&ssid=Car"
+            )
+        )
     }
 
     @Test
-    fun parse_validUriWithoutEndpointFields() {
-        val parsed = PairingUriParser.parse("openauto://pair?pin=123456&ssid=CarAP")
-        requireNotNull(parsed)
-        assertEquals("123456", parsed.pin)
-        assertEquals("CarAP", parsed.ssid)
-        assertNull(parsed.host)
-        assertNull(parsed.port)
-    }
+    fun parse_rejectsMissingOrMalformedRequiredFields() {
+        val valid = "prodigy://pair?host=10.0.0.1&tcp=9810&ws=9811&pin=123456&ssid=Car"
 
-    @Test
-    fun parse_rejectsInvalidSchemeOrPath() {
-        assertNull(PairingUriParser.parse("https://pair?pin=123456&ssid=CarAP"))
-        assertNull(PairingUriParser.parse("openauto://wrong?pin=123456&ssid=CarAP"))
-    }
-
-    @Test
-    fun parse_rejectsInvalidPort() {
-        assertNull(PairingUriParser.parse("openauto://pair?pin=123456&ssid=CarAP&port=abc"))
-        assertNull(PairingUriParser.parse("openauto://pair?pin=123456&ssid=CarAP&port=0"))
-        assertNull(PairingUriParser.parse("openauto://pair?pin=123456&ssid=CarAP&port=70000"))
+        listOf(
+            valid.replace("host=10.0.0.1&", ""),
+            valid.replace("tcp=9810&", ""),
+            valid.replace("ws=9811&", ""),
+            valid.replace("pin=123456&", ""),
+            valid.replace("&ssid=Car", ""),
+            valid.replace("host=10.0.0.1", "host=%20"),
+            valid.replace("tcp=9810", "tcp=0"),
+            valid.replace("tcp=9810", "tcp=70000"),
+            valid.replace("ws=9811", "ws=abc"),
+            valid.replace("pin=123456", "pin=12345"),
+            valid.replace("ssid=Car", "ssid=%20"),
+            valid.replace("ssid=Car", "ssid=%ZZ")
+        ).forEach { assertNull(PairingUriParser.parse(it)) }
     }
 }

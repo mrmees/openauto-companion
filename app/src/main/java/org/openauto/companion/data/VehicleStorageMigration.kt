@@ -70,6 +70,7 @@ object VehicleStorageMigration {
                 apiClientId = json.getString("api_client_id").trim(),
                 apiSecretHex = json.getString("api_secret_hex").trim(),
                 serverId = json.optString("server_id", "").trim().ifBlank { null },
+                apiTcpPort = json.optionalInt("api_tcp_port") ?: Vehicle.DEFAULT_API_TCP_PORT,
                 socks5Enabled = json.optBoolean("socks5_enabled", true),
                 audioKeepAlive = json.optBoolean("audio_keep_alive", false),
                 settingsHost = json.optString("settings_host", "").trim().ifBlank { null },

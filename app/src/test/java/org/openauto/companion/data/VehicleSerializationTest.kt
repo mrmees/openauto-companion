@@ -16,6 +16,7 @@ class VehicleSerializationTest {
             ssid = "MiataAA-A3F2",
             name = "Miata",
             serverId = "server-1",
+            apiTcpPort = 19810,
             socks5Enabled = false,
             audioKeepAlive = true,
             settingsHost = "10.0.0.42",
@@ -54,6 +55,7 @@ class VehicleSerializationTest {
         assertTrue(vehicle.socks5Enabled)
         assertFalse(vehicle.audioKeepAlive)
         assertNull(vehicle.serverId)
+        assertEquals(9810, vehicle.apiTcpPort)
         assertNull(vehicle.settingsHost)
         assertNull(vehicle.settingsPort)
         assertNull(vehicle.displayWidth)
@@ -78,8 +80,16 @@ class VehicleSerializationTest {
         val missingSecret = requiredJson().apply { remove("api_secret_hex") }
         val malformedSecret = requiredJson().put("api_secret_hex", "zz".repeat(32))
         val shortSecret = requiredJson().put("api_secret_hex", "aa".repeat(31))
+        val invalidPort = requiredJson().put("api_tcp_port", 0)
 
-        listOf(missingClient, blankClient, missingSecret, malformedSecret, shortSecret)
+        listOf(
+            missingClient,
+            blankClient,
+            missingSecret,
+            malformedSecret,
+            shortSecret,
+            invalidPort
+        )
             .forEach { json ->
                 assertThrows(Exception::class.java) { Vehicle.fromJson(json) }
             }
@@ -95,6 +105,7 @@ class VehicleSerializationTest {
         ssid: String,
         name: String = ssid,
         serverId: String? = null,
+        apiTcpPort: Int = 9810,
         socks5Enabled: Boolean = true,
         audioKeepAlive: Boolean = false,
         settingsHost: String? = null,
@@ -108,6 +119,7 @@ class VehicleSerializationTest {
         apiClientId = "client-$id",
         apiSecretHex = "ab".repeat(32),
         serverId = serverId,
+        apiTcpPort = apiTcpPort,
         socks5Enabled = socks5Enabled,
         audioKeepAlive = audioKeepAlive,
         settingsHost = settingsHost,

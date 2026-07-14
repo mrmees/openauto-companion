@@ -141,6 +141,7 @@ class WifiMonitor(
             putExtra(CompanionService.EXTRA_API_SECRET_HEX, secretHex)
             putExtra(CompanionService.EXTRA_SERVER_ID, vehicle.serverId)
             putExtra(CompanionService.EXTRA_HEAD_UNIT_HOST, vehicle.settingsHost)
+            putExtra(CompanionService.EXTRA_API_TCP_PORT, vehicle.apiTcpPort)
             putExtra(CompanionService.EXTRA_SOCKS5_ENABLED, vehicle.socks5Enabled)
             putExtra(CompanionService.EXTRA_AUDIO_KEEP_ALIVE, vehicle.audioKeepAlive)
         }

@@ -11,6 +11,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.openauto.companion.data.Vehicle
 import prodigy.api.v1.Api
+import prodigy.api.v1.Common
 
 class ApiPairingCoordinatorTest {
     @Test
@@ -37,10 +38,20 @@ class ApiPairingCoordinatorTest {
             ApiPairingDraft(ssid = "ExistingAP", displayName = "Car", host = "10.0.0.1"),
             pin = "123456"
         )
+        val invalidPort = harness.coordinator.pair(
+            ApiPairingDraft(
+                ssid = "NewAP",
+                displayName = "Car",
+                host = "10.0.0.1",
+                tcpPort = 0
+            ),
+            pin = "123456"
+        )
 
         assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, blankSsid)
         assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, invalidPin)
         assertFailureKind(ApiPairingCoordinator.FailureKind.DUPLICATE_SSID, duplicate)
+        assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, invalidPort)
         assertEquals(0, harness.resolveCalls)
         assertEquals(0, harness.transportCalls)
     }
@@ -60,7 +71,8 @@ class ApiPairingCoordinatorTest {
             draft = ApiPairingDraft(
                 ssid = "ProdigyAP",
                 displayName = "My Car",
-                host = "10.0.0.42"
+                host = "10.0.0.42",
+                tcpPort = 19810
             ),
             pin = "123456"
         )
@@ -72,10 +84,12 @@ class ApiPairingCoordinatorTest {
         assertEquals("client-123", vehicle.apiClientId)
         assertEquals(ApiCrypto.toHex(secret), vehicle.apiSecretHex)
         assertEquals("server-uuid-1", vehicle.serverId)
+        assertEquals(19810, vehicle.apiTcpPort)
         assertEquals("10.0.0.42", vehicle.settingsHost)
         assertEquals(listOf(vehicle), harness.savedVehicles)
         assertEquals("10.0.0.42", harness.transportHost)
-        assertEquals(ApiTcpTransport.DEFAULT_PORT, harness.transportPort)
+        assertEquals(19810, harness.transportPort)
+        assertEquals("ProdigyAP" to "10.0.0.42", harness.resolvedEndpoint)
         assertSame(harness.resolvedSocketFactory, harness.transportSocketFactory)
         assertTrue(client.closed)
     }
@@ -142,8 +156,36 @@ class ApiPairingCoordinatorTest {
     }
 
     @Test
+    fun pairingWindowClosedGetsCleanDedicatedFailure() = runTest {
+        val outcomes = listOf(
+            ApiSessionClient.ConnectResult.Rejected(
+                reason = "Pairing window closed",
+                errorCode = Common.ErrorCode.ERROR_CODE_PAIRING_WINDOW_CLOSED
+            ),
+            ApiSessionClient.ConnectResult.Rejected(
+                reason = "PAIRING_WINDOW_CLOSED"
+            )
+        )
+
+        outcomes.forEach { rejected ->
+            val harness = Harness(
+                clientProvider = { FakePairingClient(connectResult = rejected) }
+            )
+
+            val result = harness.coordinator.pair(draft(), pin = "123456")
+
+            assertFailureKind(ApiPairingCoordinator.FailureKind.PAIRING_WINDOW_CLOSED, result)
+            assertEquals(
+                "Pairing window closed. Start a new pairing window and scan again.",
+                (result as ApiPairingCoordinator.Result.Failure).message
+            )
+            assertNull(harness.savedVehicles)
+        }
+    }
+
+    @Test
     fun missingWifiFailsBeforeTransportCreation() = runTest {
-        val harness = Harness(resolveSocketFactory = { null })
+        val harness = Harness(resolveSocketFactory = { _, _ -> null })
 
         val result = harness.coordinator.pair(draft(), pin = "123456")
 
@@ -166,7 +208,7 @@ class ApiPairingCoordinatorTest {
 
     private class Harness(
         initialVehicles: List<Vehicle> = emptyList(),
-        resolveSocketFactory: ((String) -> (() -> Socket)?)? = null,
+        resolveSocketFactory: ((String, String) -> (() -> Socket)?)? = null,
         private val clientProvider: () -> ApiRuntimeClient = {
             FakePairingClient(connectResult = readyResult("client", ByteArray(32)))
         }
@@ -175,16 +217,18 @@ class ApiPairingCoordinatorTest {
         var savedVehicles: List<Vehicle>? = null
         var resolveCalls = 0
         var transportCalls = 0
+        var resolvedEndpoint: Pair<String, String>? = null
         var transportHost: String? = null
         var transportPort: Int? = null
         var transportSocketFactory: (() -> Socket)? = null
 
-        private val socketResolver: (String) -> (() -> Socket)? = { ssid ->
+        private val socketResolver: (String, String) -> (() -> Socket)? = { ssid, host ->
             resolveCalls += 1
+            resolvedEndpoint = ssid to host
             if (resolveSocketFactory == null) {
                 resolvedSocketFactory
             } else {
-                resolveSocketFactory(ssid)
+                resolveSocketFactory(ssid, host)
             }
         }
 
@@ -240,7 +284,8 @@ class ApiPairingCoordinatorTest {
     private fun draft() = ApiPairingDraft(
         ssid = "ProdigyAP",
         displayName = "My Car",
-        host = "10.0.0.1"
+        host = "10.0.0.1",
+        tcpPort = ApiTcpTransport.DEFAULT_PORT
     )
 
     private fun assertFailureKind(

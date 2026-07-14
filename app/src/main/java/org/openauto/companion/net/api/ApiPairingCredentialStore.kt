@@ -17,11 +17,14 @@ class ApiPairingCredentialStore(
         ssid: String,
         displayName: String,
         host: String,
+        tcpPort: Int,
         ready: ApiSessionClient.ConnectResult.Ready
     ): Vehicle? {
         val normalizedSsid = ssid.trim()
         val normalizedHost = host.trim()
-        if (normalizedSsid.isBlank() || normalizedHost.isBlank()) return null
+        if (normalizedSsid.isBlank() || normalizedHost.isBlank() || tcpPort !in 1..65535) {
+            return null
+        }
 
         val credentials = ready.pairedCredentials ?: return null
         val clientId = credentials.clientId.trim()
@@ -43,6 +46,7 @@ class ApiPairingCredentialStore(
             apiClientId = clientId,
             apiSecretHex = ApiCrypto.toHex(credentials.secret),
             serverId = serverId,
+            apiTcpPort = tcpPort,
             settingsHost = normalizedHost
         )
         saveVehicles(current + vehicle)

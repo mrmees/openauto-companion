@@ -5,16 +5,18 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import org.openauto.companion.data.Vehicle
+import prodigy.api.v1.Common
 
 data class ApiPairingDraft(
     val ssid: String,
     val displayName: String,
-    val host: String = ApiTcpTransport.DEFAULT_HOST
+    val host: String = ApiTcpTransport.DEFAULT_HOST,
+    val tcpPort: Int = ApiTcpTransport.DEFAULT_PORT
 )
 
 class ApiPairingCoordinator(
     private val credentialStore: ApiPairingCredentialStore,
-    private val resolveSocketFactory: (ssid: String) -> (() -> Socket)?,
+    private val resolveSocketFactory: (ssid: String, host: String) -> (() -> Socket)?,
     private val transportFactory: (
         host: String,
         port: Int,
@@ -34,6 +36,7 @@ class ApiPairingCoordinator(
         INVALID_INPUT,
         DUPLICATE_SSID,
         WIFI_NOT_FOUND,
+        PAIRING_WINDOW_CLOSED,
         REJECTED,
         CONNECTION_FAILED,
         INVALID_READY,
@@ -61,8 +64,14 @@ class ApiPairingCoordinator(
             "This Wi-Fi network is already paired"
         )
 
+        val host = draft.host.trim().ifBlank { ApiTcpTransport.DEFAULT_HOST }
+        if (draft.tcpPort !in 1..65535) return@coroutineScope failure(
+            FailureKind.INVALID_INPUT,
+            "API TCP port is invalid"
+        )
+
         val socketFactory = try {
-            resolveSocketFactory(ssid)
+            resolveSocketFactory(ssid, host)
         } catch (_: CancellationException) {
             return@coroutineScope Result.Cancelled
         } catch (error: Exception) {
@@ -75,20 +84,28 @@ class ApiPairingCoordinator(
             "Connect the phone to $ssid before pairing"
         )
 
-        val host = draft.host.trim().ifBlank { ApiTcpTransport.DEFAULT_HOST }
         var client: ApiRuntimeClient? = null
         try {
-            val transport = transportFactory(host, ApiTcpTransport.DEFAULT_PORT, socketFactory)
+            val transport = transportFactory(host, draft.tcpPort, socketFactory)
             client = clientFactory(
                 transport,
                 ApiHandshake.pairing(clientName = CLIENT_NAME, pin = pin),
                 this
             )
             when (val connect = client.connect()) {
-                is ApiSessionClient.ConnectResult.Rejected -> failure(
-                    FailureKind.REJECTED,
-                    connect.reason.ifBlank { "Pairing was rejected" }
-                )
+                is ApiSessionClient.ConnectResult.Rejected -> {
+                    if (connect.isPairingWindowClosed()) {
+                        failure(
+                            FailureKind.PAIRING_WINDOW_CLOSED,
+                            "Pairing window closed. Start a new pairing window and scan again."
+                        )
+                    } else {
+                        failure(
+                            FailureKind.REJECTED,
+                            connect.reason.ifBlank { "Pairing was rejected" }
+                        )
+                    }
+                }
                 is ApiSessionClient.ConnectResult.Disconnected -> failure(
                     FailureKind.CONNECTION_FAILED,
                     connect.reason.ifBlank { "Connection closed during pairing" }
@@ -97,6 +114,7 @@ class ApiPairingCoordinator(
                     ssid = ssid,
                     displayName = draft.displayName,
                     host = host,
+                    tcpPort = draft.tcpPort,
                     ready = connect
                 )
             }
@@ -116,6 +134,7 @@ class ApiPairingCoordinator(
         ssid: String,
         displayName: String,
         host: String,
+        tcpPort: Int,
         ready: ApiSessionClient.ConnectResult.Ready
     ): Result {
         val credentials = ready.pairedCredentials
@@ -134,6 +153,7 @@ class ApiPairingCoordinator(
                 ssid = ssid,
                 displayName = displayName,
                 host = host,
+                tcpPort = tcpPort,
                 ready = ready
             ) ?: return failure(
                 if (credentialStore.containsSsid(ssid)) {
@@ -154,6 +174,16 @@ class ApiPairingCoordinator(
 
     private fun failure(kind: FailureKind, message: String): Result.Failure =
         Result.Failure(kind = kind, message = message)
+
+    private fun ApiSessionClient.ConnectResult.Rejected.isPairingWindowClosed(): Boolean {
+        if (errorCode == Common.ErrorCode.ERROR_CODE_PAIRING_WINDOW_CLOSED) {
+            return true
+        }
+        return reason
+            .uppercase()
+            .replace(Regex("[^A-Z]+"), "_")
+            .trim('_') == "PAIRING_WINDOW_CLOSED"
+    }
 
     private companion object {
         val PIN_PATTERN = Regex("\\d{6}")

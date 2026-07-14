@@ -8,6 +8,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import prodigy.api.v1.Api
+import prodigy.api.v1.Common
 
 class ApiSessionClient(
     private val transport: ApiTransport,
@@ -20,7 +21,10 @@ class ApiSessionClient(
             val pairedCredentials: ApiHandshake.PairedCredentials?
         ) : ConnectResult()
 
-        data class Rejected(val reason: String) : ConnectResult()
+        data class Rejected(
+            val reason: String,
+            val errorCode: Common.ErrorCode? = null
+        ) : ConnectResult()
 
         data class Disconnected(
             val reason: String,
@@ -30,7 +34,10 @@ class ApiSessionClient(
 
     sealed class ReadyClose {
         data class PeerClosed(val reason: String) : ReadyClose()
-        data class Rejected(val reason: String) : ReadyClose()
+        data class Rejected(
+            val reason: String,
+            val errorCode: Common.ErrorCode? = null
+        ) : ReadyClose()
         data class Failed(val error: Throwable) : ReadyClose()
         data object ClientClosed : ReadyClose()
     }
@@ -64,7 +71,10 @@ class ApiSessionClient(
                             pairedCredentials = result.pairedCredentials
                         )
                     }
-                    is ApiHandshake.Result.Terminal -> return rejected(result.reason)
+                    is ApiHandshake.Result.Terminal -> return rejected(
+                        reason = result.reason,
+                        errorCode = result.errorCode
+                    )
                 }
             }
         } catch (error: CancellationException) {
@@ -119,7 +129,12 @@ class ApiSessionClient(
                         Api.ApiMessage.PayloadCase.ERROR -> {
                             transport.close()
                             incoming.close()
-                            readyClose.complete(ReadyClose.Rejected(message.error.message))
+                            readyClose.complete(
+                                ReadyClose.Rejected(
+                                    reason = message.error.message,
+                                    errorCode = message.error.code
+                                )
+                            )
                             return@launch
                         }
                         else -> incoming.send(message)
@@ -135,11 +150,14 @@ class ApiSessionClient(
         }
     }
 
-    private fun rejected(reason: String): ConnectResult.Rejected {
+    private fun rejected(
+        reason: String,
+        errorCode: Common.ErrorCode? = null
+    ): ConnectResult.Rejected {
         transport.close()
         incoming.close()
-        readyClose.complete(ReadyClose.Rejected(reason))
-        return ConnectResult.Rejected(reason)
+        readyClose.complete(ReadyClose.Rejected(reason, errorCode))
+        return ConnectResult.Rejected(reason, errorCode)
     }
 
     private fun disconnected(reason: String, cause: Throwable? = null): ConnectResult.Disconnected {

@@ -20,6 +20,7 @@ class ApiPairingCredentialStoreTest {
             ssid = "ProdigyAP",
             displayName = "My Car",
             host = "10.0.0.42",
+            tcpPort = 19810,
             ready = readyWithCredentials(
                 clientId = "client-123",
                 secret = secret,
@@ -33,6 +34,7 @@ class ApiPairingCredentialStoreTest {
         assertEquals("client-123", vehicle.apiClientId)
         assertEquals(ApiCrypto.toHex(secret), vehicle.apiSecretHex)
         assertEquals("server-uuid-1", vehicle.serverId)
+        assertEquals(19810, vehicle.apiTcpPort)
         assertEquals("10.0.0.42", vehicle.settingsHost)
     }
 
@@ -45,6 +47,7 @@ class ApiPairingCredentialStoreTest {
             ssid = "ProdigyAP",
             displayName = "  ",
             host = "10.0.0.1",
+            tcpPort = ApiTcpTransport.DEFAULT_PORT,
             ready = readyWithCredentials("client", ByteArray(32))
         )
 
@@ -68,6 +71,7 @@ class ApiPairingCredentialStoreTest {
                 "NewAP",
                 "New",
                 "10.0.0.1",
+                ApiTcpTransport.DEFAULT_PORT,
                 noCredentials
             )
         )
@@ -76,6 +80,7 @@ class ApiPairingCredentialStoreTest {
                 "NewAP",
                 "New",
                 "10.0.0.1",
+                ApiTcpTransport.DEFAULT_PORT,
                 readyWithCredentials("", ByteArray(32))
             )
         )
@@ -84,6 +89,7 @@ class ApiPairingCredentialStoreTest {
                 "NewAP",
                 "New",
                 "10.0.0.1",
+                ApiTcpTransport.DEFAULT_PORT,
                 readyWithCredentials("client", ByteArray(31))
             )
         )
@@ -92,6 +98,7 @@ class ApiPairingCredentialStoreTest {
                 "ExistingAP",
                 "Existing",
                 "10.0.0.1",
+                ApiTcpTransport.DEFAULT_PORT,
                 readyWithCredentials("client", ByteArray(32))
             )
         )

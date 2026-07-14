@@ -6,8 +6,8 @@ OpenAuto Companion is an Android app that securely connects a phone to an OpenAu
 
 ## Primary User Outcomes
 
-- Pair a vehicle through live manual PIN entry; keep v1 QR pairing as future
-  work until its payload and UX are explicitly approved.
+- Pair a vehicle without typing through the approved API v1 QR payload, with
+  live manual PIN entry retained as the fallback.
 - Reconnect automatically when in range of a paired vehicle SSID.
 - See clear connection status and sharing state.
 - Open head unit settings from phone with minimal friction.
@@ -27,8 +27,9 @@ OpenAuto Companion is an Android app that securely connects a phone to an OpenAu
 ## Constraints
 
 - Android app using Kotlin + Jetpack Compose.
-- Companion runtime targets head unit host `10.0.0.1` over External API v1 TCP
-  `9810`; web configuration and theme installation remain HTTP on `8080`.
+- Companion runtime uses the validated host and External API v1 TCP port saved
+  at pairing; manual/existing records default to `10.0.0.1:9810`. Web
+  configuration and theme installation remain HTTP on `8080`.
 - Web settings UI is expected on `http://<host>:8080`.
 - Runtime service depends on location, Wi-Fi, and foreground-service constraints.
 - Solo-maintained project: process must remain lightweight.
@@ -66,9 +67,21 @@ Current blockers:
   - Status: Open
 
 - Dynamic identity and endpoint advertisement for settings/connection routing.
-  - Need: discovery/pairing payload must include validated host/port and a stable `vehicle_id` value in addition to SSID, with change notifications.
+  - Need: discovery/pairing must provide validated host/port and SSID, with a
+    stable authenticated `server_id` for post-pairing identity.
   - Why: hardcoded host/MAC assumptions break under DHCP changes, device replacement, and non-default network layouts; relying on SSID alone breaks after SSID reuse.
   - Companion impact: per-vehicle selection, session routing, and settings-launch routing remain ambiguous without stable vehicle identity.
+  - Status: Delivered
+
+- External API v1 QR pairing SSID and terminal expiry contract.
+  - Need: Prodigy's QR must add its percent-encoded AP SSID, and the server must
+    document/test the exact terminal frame emitted for a closed pairing window.
+  - Why: Android can redact the Android Auto-owned network's SSID, while
+    Companion needs it for persistence/reconnect; typed expiry semantics avoid
+    matching program behavior against human-readable text.
+  - Companion impact: delivered and live-validated. The deployed QR provides
+    the SSID, physical scan-to-READY works, and the fixed remote TCP path now
+    delivers the typed expiry frame before clean close.
   - Status: Delivered
 
 - Deterministic Pi desktop/system routing behavior under phone-to-headunit SOCKS bridge.
@@ -98,8 +111,10 @@ Current blockers:
 - External API v1 terminal rejection frame delivery.
   - Need: remote invalid-auth/error paths should deliver terminal `AuthReject` or `Error` frames before closing the connection.
   - Why: after the new Prodigy build exposed v1 listeners, a Pixel app-bound invalid known-client TCP probe connected to `9810` but observed connection close before a terminal auth/error frame.
-  - Companion impact: normal pairing/known-client validation can proceed, but terminal-frame handling remains unproven against live hardware until the head unit flushes terminal frames or a packet/log capture proves delivery.
-  - Status: Open
+  - Companion impact: delivered. Prodigy now flushes terminal bytes before
+    teardown, pins production-lifetime delivery with a real-TCP regression, and
+    the Pixel received the typed closed-window frame on the deployed service.
+  - Status: Delivered
 
 ## Non-Goals
 
@@ -130,3 +145,13 @@ Current blockers:
   legacy listener disabled: manual pairing, saved-client reconnect, all four
   report types, bridge teardown/replay, report-owner clearing, and Android Auto
   session continuity passed.
+- 2026-07-13: Approved API v1 QR pairing as the zero-input convenience path,
+  retaining manual PIN pairing and persisting live TCP endpoints advertised by
+  Prodigy.
+- 2026-07-13: Physical Prodigy QR scan-to-READY and saved-client reconnect
+  passed on the Pixel. Closed-window validation remains blocked because the
+  deployed Prodigy TCP path closes before delivering its documented typed
+  terminal frame, including with a protocol-compliant nonzero request ID.
+- 2026-07-13: Prodigy fixed the real-socket terminal-frame flush/lifetime bug;
+  the Pixel then passed the closed-window typed-error path, a fresh physical QR
+  scan-to-READY, and saved-client reconnect with all Companion reports active.

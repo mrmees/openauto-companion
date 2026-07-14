@@ -103,7 +103,9 @@ class ApiSessionClientTest {
         val result = client.connect()
 
         assertTrue(result is ApiSessionClient.ConnectResult.Rejected)
-        assertEquals("unsupported version", (result as ApiSessionClient.ConnectResult.Rejected).reason)
+        result as ApiSessionClient.ConnectResult.Rejected
+        assertEquals("unsupported version", result.reason)
+        assertEquals(Common.ErrorCode.ERROR_CODE_UNSUPPORTED_VERSION, result.errorCode)
         assertTrue(transport.closed)
     }
 

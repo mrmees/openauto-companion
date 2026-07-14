@@ -12,6 +12,7 @@ data class Vehicle(
     val apiClientId: String,
     val apiSecretHex: String,
     val serverId: String? = null,
+    val apiTcpPort: Int = DEFAULT_API_TCP_PORT,
     val socks5Enabled: Boolean = true,
     val audioKeepAlive: Boolean = false,
     val settingsHost: String? = null,
@@ -25,6 +26,7 @@ data class Vehicle(
         require(ApiCrypto.decodeSecretHex(apiSecretHex) != null) {
             "API secret must be 32-byte hexadecimal"
         }
+        require(apiTcpPort in 1..65535) { "API TCP port must be valid" }
     }
 
     fun toJson(): JSONObject = JSONObject().apply {
@@ -34,6 +36,7 @@ data class Vehicle(
         put("api_client_id", apiClientId)
         put("api_secret_hex", apiSecretHex)
         if (!serverId.isNullOrBlank()) put("server_id", serverId)
+        put("api_tcp_port", apiTcpPort)
         put("socks5_enabled", socks5Enabled)
         put("audio_keep_alive", audioKeepAlive)
         if (!settingsHost.isNullOrBlank()) put("settings_host", settingsHost)
@@ -55,6 +58,7 @@ data class Vehicle(
                 apiClientId = json.getString("api_client_id").trim(),
                 apiSecretHex = json.getString("api_secret_hex").trim(),
                 serverId = json.optString("server_id", "").trim().ifBlank { null },
+                apiTcpPort = json.optionalInt("api_tcp_port") ?: DEFAULT_API_TCP_PORT,
                 socks5Enabled = json.optBoolean("socks5_enabled", true),
                 audioKeepAlive = json.optBoolean("audio_keep_alive", false),
                 settingsHost = json.optString("settings_host", "").trim().ifBlank { null },
@@ -77,5 +81,6 @@ data class Vehicle(
             if (has(key) && !isNull(key)) getInt(key) else null
 
         const val MAX_VEHICLES = 20
+        const val DEFAULT_API_TCP_PORT = 9810
     }
 }
