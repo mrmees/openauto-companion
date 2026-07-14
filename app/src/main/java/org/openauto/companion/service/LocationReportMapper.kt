@@ -59,6 +59,7 @@ class LocationReportMapper(
             bearingDeg = bearing,
             accuracyM = accuracy,
             ageMs = ageMs,
+            capturedAtElapsedRealtimeMs = nowElapsedRealtimeNanos / NANOS_PER_MILLISECOND,
             altitudeM = altitude
         )
     }

@@ -7,6 +7,7 @@ import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import prodigy.api.v1.Api
+import prodigy.api.v1.Common
 import prodigy.api.v1.System as SystemProto
 
 interface ApiRuntimeClient : AutoCloseable {
@@ -74,7 +75,11 @@ class ApiRuntimeLoop(
                         }
 
                         is ApiSessionClient.ConnectResult.Rejected -> {
-                            AttemptOutcome.RePairRequired(connectResult.reason)
+                            if (connectResult.errorCode.requiresRepair()) {
+                                AttemptOutcome.RePairRequired(connectResult.reason)
+                            } else {
+                                AttemptOutcome.Retry(connectResult.reason)
+                            }
                         }
 
                         is ApiSessionClient.ConnectResult.Ready -> {
@@ -86,7 +91,11 @@ class ApiRuntimeLoop(
                                 onStateChanged(State.Ready(connectResult.serverHello))
                                 when (val close = runReadySession(client)) {
                                     is ApiSessionClient.ReadyClose.Rejected -> {
-                                        AttemptOutcome.RePairRequired(close.reason)
+                                        if (close.errorCode.requiresRepair()) {
+                                            AttemptOutcome.RePairRequired(close.reason)
+                                        } else {
+                                            AttemptOutcome.Retry(close.reason)
+                                        }
                                     }
 
                                     is ApiSessionClient.ReadyClose.Failed -> {
@@ -192,4 +201,9 @@ class ApiRuntimeLoop(
         onStateChanged(State.WaitingToRetry(attempt, reason))
         retryDelay(attempt)
     }
+
+    private fun Common.ErrorCode?.requiresRepair(): Boolean =
+        this == null ||
+            this == Common.ErrorCode.ERROR_CODE_NOT_AUTHENTICATED ||
+            this == Common.ErrorCode.ERROR_CODE_AUTH_FAILED
 }

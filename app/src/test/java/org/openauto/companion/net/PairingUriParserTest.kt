@@ -32,6 +32,17 @@ class PairingUriParserTest {
     }
 
     @Test
+    fun parse_preservesLiteralPlusAsRfc3986Data() {
+        val parsed = PairingUriParser.parse(
+            "prodigy://pair?host=10.0.0.1&tcp=9810&ws=9811&pin=123456" +
+                "&ssid=Car+AP"
+        )
+
+        requireNotNull(parsed)
+        assertEquals("Car+AP", parsed.ssid)
+    }
+
+    @Test
     fun parse_rejectsWrongSchemeOrAuthority() {
         assertNull(
             PairingUriParser.parse(

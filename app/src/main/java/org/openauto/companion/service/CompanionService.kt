@@ -78,12 +78,18 @@ class CompanionService : Service() {
         }
 
         val config = parseRuntimeConfig(intent)
-        startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
         if (config == null) {
+            val requestedIdentity = requestedVehicleIdentity(intent)
+            if (requestedIdentity == currentVehicleKey && generationJob?.isActive == true) {
+                Log.w(TAG, "Ignoring redundant start while the live runtime's Wi-Fi handle is unavailable")
+                return START_STICKY
+            }
+            startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
             Log.e(TAG, "Refusing to start runtime without valid External API v1 credentials")
             stopSelfResult(startId)
             return START_NOT_STICKY
         }
+        startForeground(NOTIFICATION_ID, buildNotification("Connecting..."))
 
         _vehicleName.value = config.vehicleName
         _vehicleId.value = config.vehicleIdentity
@@ -105,6 +111,12 @@ class CompanionService : Service() {
 
         startRuntimeGeneration(config)
         return START_STICKY
+    }
+
+    private fun requestedVehicleIdentity(intent: Intent?): String {
+        val vehicleId = intent?.getStringExtra(EXTRA_VEHICLE_ID)?.trim().orEmpty()
+        val vehicleSsid = intent?.getStringExtra(EXTRA_VEHICLE_SSID)?.trim().orEmpty()
+        return VehicleIdentity.resolve(vehicleId, vehicleSsid)
     }
 
     private fun parseRuntimeConfig(intent: Intent?): RuntimeConfig? {
@@ -168,7 +180,8 @@ class CompanionService : Service() {
     private suspend fun runRuntimeGeneration(token: Long, config: RuntimeConfig) = coroutineScope {
         val publisher = ApiReportPublisher(
             currentTimeMs = System::currentTimeMillis,
-            timezoneId = { TimeZone.getDefault().id.takeIf(String::isNotBlank) }
+            timezoneId = { TimeZone.getDefault().id.takeIf(String::isNotBlank) },
+            elapsedRealtimeMs = SystemClock::elapsedRealtime
         )
         val resources = RuntimeResources(
             token = token,

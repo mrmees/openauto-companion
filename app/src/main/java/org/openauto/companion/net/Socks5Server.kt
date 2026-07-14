@@ -19,7 +19,9 @@ class Socks5Server(
     private val port: Int = 1080,
     private val bindAddress: String = "0.0.0.0",
     private val password: String,
-    private val upstreamNetworkProvider: () -> Network? = { null }
+    private val upstreamNetworkProvider: () -> Network? = { null },
+    private val upstreamSocketFactory: () -> Socket = { Socket() },
+    private val onStarted: (String) -> Unit = { Log.i(TAG, it) }
 ) {
     private var serverSocket: ServerSocket? = null
     private val running = AtomicBoolean(false)
@@ -45,7 +47,7 @@ class Socks5Server(
         }
 
         acceptThread = Thread({
-            Log.i(TAG, "SOCKS5 server listening on $bindAddress:$port")
+            onStarted("SOCKS5 server listening on $bindAddress:$port")
             while (running.get()) {
                 try {
                     val client = serverSocket!!.accept()
@@ -141,18 +143,22 @@ class Socks5Server(
                 return
             }
 
-            val remote = Socket()
-            upstreamNetworkProvider()?.bindSocket(remote)
-
+            val remote = upstreamSocketFactory()
             try {
-                remote.connect(InetSocketAddress(destHost, destPort), CONNECT_TIMEOUT_MS)
-            } catch (e: Exception) {
-                sendReply(output, 0x05)
-                return
-            }
+                upstreamNetworkProvider()?.bindSocket(remote)
+                remote.soTimeout = IDLE_TIMEOUT_MS
+                try {
+                    remote.connect(InetSocketAddress(destHost, destPort), CONNECT_TIMEOUT_MS)
+                } catch (e: Exception) {
+                    sendReply(output, 0x05)
+                    return
+                }
 
-            sendReply(output, 0x00)
-            relay(client, remote)
+                sendReply(output, 0x00)
+                relay(client, remote)
+            } finally {
+                try { remote.close() } catch (_: Exception) {}
+            }
         } catch (e: Exception) {
             Log.d(TAG, "Client handler error", e)
         } finally {
@@ -204,23 +210,30 @@ class Socks5Server(
     }
 
     private fun relay(client: Socket, remote: Socket) {
+        fun closeBoth() {
+            try { client.close() } catch (_: Exception) {}
+            try { remote.close() } catch (_: Exception) {}
+        }
         val t1 = Thread({
             try {
                 client.getInputStream().copyTo(remote.getOutputStream())
-            } catch (_: Exception) {}
-            try { remote.shutdownOutput() } catch (_: Exception) {}
+                try { remote.shutdownOutput() } catch (_: Exception) {}
+            } catch (_: Exception) {
+                closeBoth()
+            }
         }, "relay-c2r")
 
         val t2 = Thread({
             try {
                 remote.getInputStream().copyTo(client.getOutputStream())
-            } catch (_: Exception) {}
-            try { client.shutdownOutput() } catch (_: Exception) {}
+                try { client.shutdownOutput() } catch (_: Exception) {}
+            } catch (_: Exception) {
+                closeBoth()
+            }
         }, "relay-r2c")
 
         t1.start(); t2.start()
         t1.join(); t2.join()
-        try { remote.close() } catch (_: Exception) {}
     }
 
     companion object {

@@ -104,6 +104,28 @@ class ApiRuntimeLoopTest {
     }
 
     @Test
+    fun nonAuthHandshakeErrorRetriesBeforeAuthRejectionRequiresRepair() = runTest {
+        val clients = ArrayDeque(
+            listOf(
+                rejectedClient(
+                    "unsupported version",
+                    Common.ErrorCode.ERROR_CODE_UNSUPPORTED_VERSION
+                ),
+                rejectedClient("unknown client")
+            )
+        )
+        val retryAttempts = mutableListOf<Int>()
+
+        val exit = runtime(
+            clientFactory = { clients.removeFirst() },
+            retryDelay = { retryAttempts += it }
+        ).run()
+
+        assertEquals(listOf(0), retryAttempts)
+        assertEquals(ApiRuntimeLoop.Exit.RePairRequired("unknown client"), exit)
+    }
+
+    @Test
     fun rejectionAfterReadyStopsWithoutRetry() = runTest {
         var factoryCalls = 0
         var retryCalls = 0
@@ -120,6 +142,30 @@ class ApiRuntimeLoopTest {
 
         assertEquals(1, factoryCalls)
         assertEquals(0, retryCalls)
+        assertEquals(ApiRuntimeLoop.Exit.RePairRequired("credentials revoked"), exit)
+    }
+
+    @Test
+    fun nonAuthErrorAfterReadyRetriesBeforeAuthRejectionRequiresRepair() = runTest {
+        val clients = ArrayDeque(
+            listOf(
+                readyClient(
+                    readyClose = ApiSessionClient.ReadyClose.Rejected(
+                        "temporary server fault",
+                        Common.ErrorCode.ERROR_CODE_INTERNAL
+                    )
+                ),
+                rejectedClient("credentials revoked")
+            )
+        )
+        val retryAttempts = mutableListOf<Int>()
+
+        val exit = runtime(
+            clientFactory = { clients.removeFirst() },
+            retryDelay = { retryAttempts += it }
+        ).run()
+
+        assertEquals(listOf(0), retryAttempts)
         assertEquals(ApiRuntimeLoop.Exit.RePairRequired("credentials revoked"), exit)
     }
 
@@ -294,7 +340,8 @@ class ApiRuntimeLoopTest {
     private fun countingPublisher(onRun: () -> Unit = {}): ReadyReportPublisher {
         val delegate = ApiReportPublisher(
             currentTimeMs = { 1_765_000_000_000L },
-            timezoneId = { "America/Chicago" }
+            timezoneId = { "America/Chicago" },
+            elapsedRealtimeMs = { 1_000L }
         )
         return object : ReadyReportPublisher {
             override suspend fun runReadySession(
@@ -311,8 +358,11 @@ class ApiRuntimeLoopTest {
         connectResult = ApiSessionClient.ConnectResult.Disconnected(reason)
     )
 
-    private fun rejectedClient(reason: String) = FakeRuntimeClient(
-        connectResult = ApiSessionClient.ConnectResult.Rejected(reason)
+    private fun rejectedClient(
+        reason: String,
+        errorCode: Common.ErrorCode? = null
+    ) = FakeRuntimeClient(
+        connectResult = ApiSessionClient.ConnectResult.Rejected(reason, errorCode)
     )
 
     private fun readyClient(

@@ -59,7 +59,9 @@ object PairingUriParser {
     }
 
     private fun decode(value: String): String =
-        URLDecoder.decode(value, StandardCharsets.UTF_8.toString())
+        // URI queries use RFC 3986 encoding: a literal '+' is data, not the
+        // application/x-www-form-urlencoded spelling of a space.
+        URLDecoder.decode(value.replace("+", "%2B"), StandardCharsets.UTF_8.toString())
 
     private val PIN_PATTERN = Regex("[0-9]{6}")
 }

@@ -17,9 +17,9 @@ class CompanionApp : Application() {
     }
 
     fun startWifiMonitor(vehicles: List<Vehicle>) {
-        // Activity recreation calls this path; replacing the callback owner must not
-        // tear down the foreground runtime that already owns the live API session.
-        wifiMonitorSlot.replace(WifiMonitor(this, vehicles))
+        // The Application owns the callback. Activity recreation must reuse it so
+        // there is no unregister/register gap in which a real Wi-Fi loss can vanish.
+        wifiMonitorSlot.startIfAbsent(WifiMonitor(this, vehicles))
     }
 
     fun stopWifiMonitor() {

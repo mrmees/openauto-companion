@@ -35,6 +35,11 @@ class ApiTcpTransport(
         }
     }
 
+    override fun setReadTimeoutMillis(timeoutMs: Int) {
+        require(timeoutMs >= 0) { "Read timeout must be non-negative" }
+        requireSocket().soTimeout = timeoutMs
+    }
+
     override suspend fun receive(): Api.ApiMessage? =
         withContext(Dispatchers.IO) {
             val activeSocket = requireSocket()

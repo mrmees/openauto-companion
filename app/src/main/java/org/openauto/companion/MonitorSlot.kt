@@ -2,21 +2,21 @@ package org.openauto.companion
 
 internal interface MonitorLifecycle {
     fun start()
-    fun stop(stopService: Boolean)
+    fun stop()
 }
 
 internal class MonitorSlot<T : MonitorLifecycle> {
     var current: T? = null
         private set
 
-    fun replace(next: T) {
-        current?.stop(stopService = false)
+    fun startIfAbsent(next: T) {
+        if (current != null) return
         current = next
         next.start()
     }
 
     fun stopCurrent() {
-        current?.stop(stopService = true)
+        current?.stop()
         current = null
     }
 }

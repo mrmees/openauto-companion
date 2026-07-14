@@ -28,6 +28,7 @@ class LocationReportMapperTest {
         assertEquals(5.0, snapshot.bearingDeg, 0.0)
         assertEquals(3.5, snapshot.accuracyM, 0.0)
         assertEquals(125, snapshot.ageMs)
+        assertEquals(5_125L, snapshot.capturedAtElapsedRealtimeMs)
         assertEquals(181.2, snapshot.altitudeM!!, 0.0)
     }
 

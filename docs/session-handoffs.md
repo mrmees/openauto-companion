@@ -904,3 +904,56 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
     route teardown.
   - Prodigy `companion_status` after rotations -> API source connected with
     live GPS, battery, and internet state.
+
+## 2026-07-14 08:40 (local)
+
+- What changed:
+  - Classified API terminal failures by typed error code. `AuthReject` and
+    codes `NOT_AUTHENTICATED`/`AUTH_FAILED` require re-pairing; other
+    connection-level errors retry, while request-scoped errors remain on the
+    live session for their request owner.
+  - Added a five-second end-to-end handshake deadline and wired it to TCP's
+    socket read timeout, preventing accepted-but-stalled peers from pinning
+    pairing or runtime state indefinitely.
+  - Refined Activity recreation handling so the Application-owned Wi-Fi
+    monitor is reused instead of unregistered/re-registered. Explicit refresh
+    and real `onLost` paths still stop the runtime; shared callback state is
+    volatile, and redundant starts cannot kill a healthy generation when the
+    Wi-Fi handle is transiently unavailable.
+  - Preserved literal `+` characters in RFC 3986 pairing-query values while
+    retaining the frozen `%2B` QR contract.
+  - Closed failed SOCKS upstream sockets, applied idle timeouts to both relay
+    sides, and made timeout failures release the paired sockets and connection
+    slot while retaining normal half-close behavior.
+  - Made replayed GPS age advance from monotonic capture time rather than
+    replaying stale fixes as newly captured.
+  - Added focused JVM/socket regressions for each corrected path. The current
+    roadmap sequence did not change, so `docs/roadmap-current.md` was left
+    unchanged.
+- Why:
+  - Address the consolidated PR #4 review blocker and reliability findings
+    before moving the External API v1 migration out of draft review.
+- Status: code-complete, full-gate verified, and the refined rotation lifecycle
+  is live-validated on the attached Pixel. Backup policy, the one-time legacy
+  migration notice, and protocol-level plaintext/offline-PIN security remain
+  explicit product/security sign-off items; this pass did not silently choose
+  those policies.
+- Next steps:
+  - 1) Commit and push the review fixes to `dev`, then update PR #4 with the
+    adjudication and verification evidence.
+  - 2) Decide whether API credentials should be excluded from Android Auto
+    Backup and whether legacy-record deletion needs a one-time user notice.
+  - 3) Continue the existing deterministic Pi desktop/system routing priority
+    after PR review is clear.
+- Verification:
+  - Red phase: the focused suite initially failed at the new monitor,
+    handshake-timeout, and GPS freshness seams before implementation.
+  - Focused regression set (API session/runtime/reporting, URI parser, monitor,
+    SOCKS, and location mapper) -> PASS (53 tests in that focused run).
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+    (`BUILD SUCCESSFUL`; 163 unit tests, zero failures).
+  - `git diff --check` -> PASS.
+  - Debug APK install on Pixel `39260DLJH000LX` -> PASS.
+  - API TCP peer after reconnect -> `[::ffff:10.0.0.21]:39004`; after forced
+    portrait/landscape rotations and restoring auto-rotate -> unchanged source
+    port `39004` throughout.

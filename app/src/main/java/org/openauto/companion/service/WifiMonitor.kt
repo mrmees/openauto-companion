@@ -21,7 +21,9 @@ class WifiMonitor(
     private val connectivityManager =
         context.getSystemService(ConnectivityManager::class.java)
     private var registered = false
+    @Volatile
     private var wifiNetwork: Network? = null
+    @Volatile
     private var activeVehicle: Vehicle? = null
     private val runtimeVehicles = vehicles.filter(::hasValidRuntimeCredentials)
     private val ssidMap: Map<String, Vehicle> = runtimeVehicles.associateBy { it.ssid }
@@ -115,14 +117,14 @@ class WifiMonitor(
         Log.i(TAG, "No paired vehicle SSID found in current networks")
     }
 
-    override fun stop(stopService: Boolean) {
+    override fun stop() {
         if (registered) {
             connectivityManager.unregisterNetworkCallback(networkCallback)
             registered = false
         }
         wifiNetwork = null
         activeVehicle = null
-        if (stopService) stopCompanionService()
+        stopCompanionService()
     }
 
     fun getWifiNetwork(): Network? = wifiNetwork

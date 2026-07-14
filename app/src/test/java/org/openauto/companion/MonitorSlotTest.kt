@@ -7,43 +7,43 @@ import org.junit.Test
 
 class MonitorSlotTest {
     @Test
-    fun replaceQuietlyStopsOnlyThePreviousMonitor() {
+    fun startIfAbsentReusesTheExistingMonitor() {
         val slot = MonitorSlot<FakeMonitor>()
         val first = FakeMonitor()
         val second = FakeMonitor()
 
-        slot.replace(first)
-        slot.replace(second)
+        slot.startIfAbsent(first)
+        slot.startIfAbsent(second)
 
         assertEquals(1, first.startCount)
-        assertEquals(listOf(false), first.stopServiceRequests)
-        assertEquals(1, second.startCount)
-        assertEquals(emptyList<Boolean>(), second.stopServiceRequests)
-        assertSame(second, slot.current)
+        assertEquals(0, first.stopCount)
+        assertEquals(0, second.startCount)
+        assertEquals(0, second.stopCount)
+        assertSame(first, slot.current)
     }
 
     @Test
     fun stopCurrentAlsoStopsTheCompanionService() {
         val slot = MonitorSlot<FakeMonitor>()
         val monitor = FakeMonitor()
-        slot.replace(monitor)
+        slot.startIfAbsent(monitor)
 
         slot.stopCurrent()
 
-        assertEquals(listOf(true), monitor.stopServiceRequests)
+        assertEquals(1, monitor.stopCount)
         assertNull(slot.current)
     }
 
     private class FakeMonitor : MonitorLifecycle {
         var startCount = 0
-        val stopServiceRequests = mutableListOf<Boolean>()
+        var stopCount = 0
 
         override fun start() {
             startCount += 1
         }
 
-        override fun stop(stopService: Boolean) {
-            stopServiceRequests += stopService
+        override fun stop() {
+            stopCount += 1
         }
     }
 }

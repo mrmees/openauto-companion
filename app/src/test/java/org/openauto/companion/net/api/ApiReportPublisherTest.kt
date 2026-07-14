@@ -15,6 +15,8 @@ import org.junit.Test
 import prodigy.api.v1.Api
 
 class ApiReportPublisherTest {
+    private var elapsedRealtimeMs = 1_000L
+
     @Test
     fun readyReplay_ordersConnectivityTimeBatteryThenGps() = runTest {
         val publisher = publisher()
@@ -153,6 +155,22 @@ class ApiReportPublisherTest {
     }
 
     @Test
+    fun replayComputesGpsAgeAtSendTime() = runTest {
+        val publisher = publisher()
+        publisher.updateGps(sampleGps(ageMs = 120))
+        elapsedRealtimeMs += 30 * 60 * 1_000L
+        val sent = Channel<Api.ApiMessage>(Channel.UNLIMITED)
+        val job = backgroundScope.launch {
+            publisher.runReadySession { sent.send(it) }
+        }
+
+        val gps = receive(sent, 3).last().gpsReport
+
+        assertEquals(30 * 60 * 1_000 + 120, gps.ageMs)
+        job.cancelAndJoin()
+    }
+
+    @Test
     fun writerFailureEscapesReadySession() = runTest {
         val publisher = publisher()
         val error = IllegalStateException("send failed")
@@ -167,7 +185,8 @@ class ApiReportPublisherTest {
 
     private fun publisher() = ApiReportPublisher(
         currentTimeMs = { 1_765_000_000_000L },
-        timezoneId = { "America/Chicago" }
+        timezoneId = { "America/Chicago" },
+        elapsedRealtimeMs = { elapsedRealtimeMs }
     )
 
     private fun sampleGps(ageMs: Int) = ApiReportPublisher.GpsSnapshot(
@@ -177,6 +196,7 @@ class ApiReportPublisherTest {
         bearingDeg = 180.0,
         accuracyM = 3.0,
         ageMs = ageMs,
+        capturedAtElapsedRealtimeMs = elapsedRealtimeMs,
         altitudeM = 181.2
     )
 

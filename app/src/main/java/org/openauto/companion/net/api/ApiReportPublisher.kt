@@ -9,7 +9,8 @@ import prodigy.api.v1.Api
 
 class ApiReportPublisher(
     private val currentTimeMs: () -> Long,
-    private val timezoneId: () -> String?
+    private val timezoneId: () -> String?,
+    private val elapsedRealtimeMs: () -> Long
 ) : ReadyReportPublisher {
     data class GpsSnapshot(
         val latitude: Double,
@@ -18,6 +19,7 @@ class ApiReportPublisher(
         val bearingDeg: Double,
         val accuracyM: Double,
         val ageMs: Int,
+        val capturedAtElapsedRealtimeMs: Long,
         val altitudeM: Double? = null
     )
 
@@ -148,6 +150,11 @@ class ApiReportPublisher(
                 }
                 if (version == sentGpsVersion) return
                 if (snapshot != null) {
+                    val elapsedSinceCapture = (elapsedRealtimeMs() - snapshot.capturedAtElapsedRealtimeMs)
+                        .coerceAtLeast(0L)
+                    val ageAtSend = (snapshot.ageMs.toLong() + elapsedSinceCapture)
+                        .coerceAtMost(Int.MAX_VALUE.toLong())
+                        .toInt()
                     send(
                         ApiReports.gpsReport(
                             latitude = snapshot.latitude,
@@ -155,7 +162,7 @@ class ApiReportPublisher(
                             speedMps = snapshot.speedMps,
                             bearingDeg = snapshot.bearingDeg,
                             accuracyM = snapshot.accuracyM,
-                            ageMs = snapshot.ageMs,
+                            ageMs = ageAtSend,
                             altitudeM = snapshot.altitudeM
                         )
                     )

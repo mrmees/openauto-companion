@@ -126,6 +126,23 @@ class ApiSessionClientTest {
     }
 
     @Test
+    fun connect_stalledHandshakeTimesOutAndClosesTransport() = runTest {
+        val transport = FakeTransport(emptyList(), closeAfterInitial = false)
+        val client = ApiSessionClient(
+            transport = transport,
+            handshake = ApiHandshake.knownClient("Pixel 9", "client-123", clientSecret),
+            scope = backgroundScope,
+            handshakeTimeoutMs = 100
+        )
+
+        val result = client.connect()
+
+        assertTrue(result is ApiSessionClient.ConnectResult.Disconnected)
+        assertEquals("Handshake timed out", (result as ApiSessionClient.ConnectResult.Disconnected).reason)
+        assertTrue(transport.closed)
+    }
+
+    @Test
     fun afterReady_readerLoopForwardsIncomingMessages() = runTest {
         val firstEvent = Api.ApiMessage.newBuilder()
             .setRequestId(1)
@@ -213,6 +230,91 @@ class ApiSessionClientTest {
             closed
         )
         assertTrue(transport.closed)
+    }
+
+    @Test
+    fun afterReady_requestScopedNonAuthErrorIsForwardedWithoutClosingSession() = runTest {
+        val requestError = error(
+            message = "topic unavailable",
+            code = Common.ErrorCode.ERROR_CODE_UNAVAILABLE,
+            requestId = 9
+        )
+        val ping = Api.ApiMessage.newBuilder()
+            .setRequestId(10)
+            .setPing(Common.Ping.getDefaultInstance())
+            .build()
+        val transport = FakeTransport(
+            listOf(authRequired(ByteArray(32)), serverHello(), requestError, ping),
+            closeAfterInitial = false
+        )
+        val client = ApiSessionClient(
+            transport = transport,
+            handshake = ApiHandshake.knownClient("Pixel 9", "client-123", clientSecret),
+            scope = backgroundScope
+        )
+        assertTrue(client.connect() is ApiSessionClient.ConnectResult.Ready)
+
+        assertEquals(requestError, withTimeout(1_000) { client.incoming.receive() })
+        assertEquals(ping, withTimeout(1_000) { client.incoming.receive() })
+        assertTrue(!transport.closed)
+        client.close()
+    }
+
+    @Test
+    fun afterReady_connectionLevelNonAuthErrorIsRetryable() = runTest {
+        val transport = FakeTransport(
+            listOf(
+                authRequired(ByteArray(32)),
+                serverHello(),
+                error(
+                    message = "outbound queue overflow",
+                    code = Common.ErrorCode.ERROR_CODE_INTERNAL,
+                    requestId = 0
+                )
+            )
+        )
+        val client = ApiSessionClient(
+            transport = transport,
+            handshake = ApiHandshake.knownClient("Pixel 9", "client-123", clientSecret),
+            scope = backgroundScope
+        )
+        assertTrue(client.connect() is ApiSessionClient.ConnectResult.Ready)
+
+        val closed = withTimeout(1_000) { client.awaitClosed() }
+
+        assertEquals(ApiSessionClient.ReadyClose.PeerClosed("outbound queue overflow"), closed)
+        assertTrue(transport.closed)
+    }
+
+    @Test
+    fun afterReady_authErrorRequiresRepair() = runTest {
+        val transport = FakeTransport(
+            listOf(
+                authRequired(ByteArray(32)),
+                serverHello(),
+                error(
+                    message = "credentials revoked",
+                    code = Common.ErrorCode.ERROR_CODE_AUTH_FAILED,
+                    requestId = 0
+                )
+            )
+        )
+        val client = ApiSessionClient(
+            transport = transport,
+            handshake = ApiHandshake.knownClient("Pixel 9", "client-123", clientSecret),
+            scope = backgroundScope
+        )
+        assertTrue(client.connect() is ApiSessionClient.ConnectResult.Ready)
+
+        val closed = withTimeout(1_000) { client.awaitClosed() }
+
+        assertEquals(
+            ApiSessionClient.ReadyClose.Rejected(
+                "credentials revoked",
+                Common.ErrorCode.ERROR_CODE_AUTH_FAILED
+            ),
+            closed
+        )
     }
 
     @Test
@@ -366,11 +468,16 @@ class ApiSessionClientTest {
             .setAuthReject(Api.AuthReject.newBuilder().setReason(reason).build())
             .build()
 
-    private fun error(message: String): Api.ApiMessage =
+    private fun error(
+        message: String,
+        code: Common.ErrorCode = Common.ErrorCode.ERROR_CODE_UNSUPPORTED_VERSION,
+        requestId: Long = 0
+    ): Api.ApiMessage =
         Api.ApiMessage.newBuilder()
+            .setRequestId(requestId)
             .setError(
                 Common.Error.newBuilder()
-                    .setCode(Common.ErrorCode.ERROR_CODE_UNSUPPORTED_VERSION)
+                    .setCode(code)
                     .setMessage(message)
                     .build()
             )
