@@ -10,13 +10,14 @@ import android.net.wifi.WifiInfo
 import android.net.wifi.WifiManager
 import android.util.Log
 import androidx.core.content.ContextCompat
+import org.openauto.companion.MonitorLifecycle
 import org.openauto.companion.data.Vehicle
 import org.openauto.companion.net.api.ApiCrypto
 
 class WifiMonitor(
     private val context: Context,
     private val vehicles: List<Vehicle>
-) {
+) : MonitorLifecycle {
     private val connectivityManager =
         context.getSystemService(ConnectivityManager::class.java)
     private var registered = false
@@ -51,7 +52,7 @@ class WifiMonitor(
         }
     }
 
-    fun start() {
+    override fun start() {
         if (registered) return
         if (runtimeVehicles.isEmpty()) {
             Log.i(TAG, "WiFi monitor has no vehicles with valid External API v1 credentials")
@@ -114,14 +115,14 @@ class WifiMonitor(
         Log.i(TAG, "No paired vehicle SSID found in current networks")
     }
 
-    fun stop() {
+    override fun stop(stopService: Boolean) {
         if (registered) {
             connectivityManager.unregisterNetworkCallback(networkCallback)
             registered = false
         }
         wifiNetwork = null
         activeVehicle = null
-        stopCompanionService()
+        if (stopService) stopCompanionService()
     }
 
     fun getWifiNetwork(): Network? = wifiNetwork

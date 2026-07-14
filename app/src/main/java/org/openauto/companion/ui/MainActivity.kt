@@ -320,6 +320,9 @@ class MainActivity : ComponentActivity() {
     private fun restartMonitoring() {
         val app = application as CompanionApp
         if (prefs.isPaired) {
+            // Pairing/unpairing and vehicle-list changes are intentional runtime
+            // refreshes, unlike the quiet monitor replacement during onCreate().
+            app.stopWifiMonitor()
             app.startWifiMonitor(prefs.vehicles)
         } else {
             app.stopWifiMonitor()

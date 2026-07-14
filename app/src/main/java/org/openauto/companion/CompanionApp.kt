@@ -7,8 +7,9 @@ import org.openauto.companion.data.Vehicle
 import org.openauto.companion.service.WifiMonitor
 
 class CompanionApp : Application() {
-    var wifiMonitor: WifiMonitor? = null
-        private set
+    private val wifiMonitorSlot = MonitorSlot<WifiMonitor>()
+    val wifiMonitor: WifiMonitor?
+        get() = wifiMonitorSlot.current
 
     override fun onCreate() {
         super.onCreate()
@@ -16,13 +17,13 @@ class CompanionApp : Application() {
     }
 
     fun startWifiMonitor(vehicles: List<Vehicle>) {
-        wifiMonitor?.stop()
-        wifiMonitor = WifiMonitor(this, vehicles).also { it.start() }
+        // Activity recreation calls this path; replacing the callback owner must not
+        // tear down the foreground runtime that already owns the live API session.
+        wifiMonitorSlot.replace(WifiMonitor(this, vehicles))
     }
 
     fun stopWifiMonitor() {
-        wifiMonitor?.stop()
-        wifiMonitor = null
+        wifiMonitorSlot.stopCurrent()
     }
 
     private fun createNotificationChannel() {

@@ -155,3 +155,6 @@ Current blockers:
 - 2026-07-13: Prodigy fixed the real-socket terminal-frame flush/lifetime bug;
   the Pixel then passed the closed-window typed-error path, a fresh physical QR
   scan-to-READY, and saved-client reconnect with all Companion reports active.
+- 2026-07-14: Separated Wi-Fi monitor replacement from real network-loss
+  teardown so Activity recreation, including phone rotation, preserves the
+  foreground API session and head-unit report ownership.

@@ -864,3 +864,43 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
   - Previous full Gradle gate remains PASS; no Companion code changed during
     this rerun.
   - AA stream continuity: not specifically observed during this final rerun.
+
+## 2026-07-14 07:30 (local)
+
+- What changed:
+  - Added an explicit monitor lifecycle seam that distinguishes quiet monitor
+    replacement from full runtime teardown.
+  - `CompanionApp.startWifiMonitor()` now unregisters the previous monitor
+    without stopping `CompanionService`, installs the new monitor, and lets the
+    service's existing same-vehicle/same-network idempotence guard preserve the
+    live External API session.
+  - Kept real `WifiMonitor.onLost()` teardown unchanged. Explicit app-driven
+    refreshes used for pairing, unpairing, and vehicle-list changes still stop
+    the old service before starting the replacement monitor.
+  - Added JVM regression coverage for both quiet replacement and explicit
+    service-stopping teardown.
+- Why:
+  - Activity recreation reran monitor startup. The previous unconditional
+    monitor stop killed the correctly surviving foreground service, causing a
+    TCP reconnect and transient clearing of GPS/battery/connectivity state on
+    Prodigy whenever the phone rotated or the Activity was recreated.
+- Status: complete and live-validated on the Pixel/Prodigy bench.
+- Next steps:
+  - 1) Commit and push the Companion lifecycle fix after review.
+  - 2) Keep head-unit owner-disconnect clearing immediate; no Prodigy debounce
+    or stale-state masking is needed.
+  - 3) Continue the existing deterministic Pi desktop/system routing priority.
+- Verification:
+  - Red regression: focused test initially failed to compile because the
+    monitor lifecycle seam did not exist.
+  - `MonitorSlotTest` after implementation -> PASS.
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+    (`BUILD SUCCESSFUL`).
+  - Debug APK install on Pixel `39260DLJH000LX` -> PASS.
+  - Pi API TCP peer before rotation -> `[::ffff:10.0.0.21]:58062`.
+  - After forced rotation 1 -> same peer/source port `58062`.
+  - After forced rotation 2 -> same peer/source port `58062`.
+  - Prodigy journal during the two-rotation window -> no owner disconnect or
+    route teardown.
+  - Prodigy `companion_status` after rotations -> API source connected with
+    live GPS, battery, and internet state.
