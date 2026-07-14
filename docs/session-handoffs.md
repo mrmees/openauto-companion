@@ -954,3 +954,53 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
   - API TCP peer after reconnect -> `[::ffff:10.0.0.21]:39004`; after forced
     portrait/landscape rotations and restoring auto-rotate -> unchanged source
     port `39004` throughout.
+
+## 2026-07-14 18:05 (local)
+
+- What changed:
+  - Changed foreground API runtime socket creation to re-resolve the matched
+    Wi-Fi `Network` from the saved vehicle SSID and host on every connection
+    attempt instead of retaining the startup handle across retries.
+  - Added a required-network socket path that fails fast when the matched
+    Wi-Fi is unavailable and never falls back to an unbound/default-network
+    socket. The existing EPERM fallback remains available to the separate
+    pairing flow.
+  - Added regressions proving per-socket re-resolution, fast failure without a
+    network, and no fallback after a bound-socket denial.
+- Why:
+  - After an airplane-mode cycle, the runtime repeatedly used the dead Android
+    `Network` handle from before the cycle. Its unbound fallback then routed
+    toward cellular and consumed about 35 seconds per failed attempt, so the
+    companion never reconnected even after the Prodigy Wi-Fi returned.
+- Status: done and live-validated on the Pixel/Prodigy bench.
+- Dependency decision:
+  - Companion-only: Yes
+- Wishlist promotion:
+  - Source item: n/a (live bench defect handoff)
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Review and commit the Companion fix on `dev`, then push when approved.
+  - 2) Record the successful self-heal rerun in Prodigy's bench handoff if that
+    repository's result ledger should be closed in the same release cycle.
+  - 3) Continue the existing deterministic Pi desktop/system routing priority.
+- Verification:
+  - Focused regression RED: test compilation failed because the new
+    required-network factory seam did not exist.
+  - `NetworkSocketFactoryTest` after implementation -> PASS.
+  - `git diff --check` -> PASS.
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+    (`BUILD SUCCESSFUL`; 166 unit tests, zero failures).
+  - Debug APK install on Pixel `39260DLJH000LX` -> PASS; initial API reports
+    and `socks5://::ffff:10.0.0.21:1080` route active.
+  - Airplane ON at 17:58:39 -> Prodigy expired the reporting session after
+    31,626 ms at 17:59:09, cleared owned companion state, and disabled the
+    proxy route.
+  - Airplane OFF at 17:59:30 -> Wi-Fi connected at 17:59:34 and Android Auto
+    connected at 17:59:36. Companion reporting, live GPS/battery, and the
+    SOCKS route recovered unattended at 18:00:08-09, within 35 seconds of
+    Wi-Fi rejoin and 39 seconds of airplane OFF.
+  - Companion PID remained `13160` across the complete cycle; no force-stop,
+    process restart, or Activity relaunch was used.
+  - AA stream continuity: the airplane cycle necessarily interrupted the
+    transport; AA reconnected automatically and the `:5277` session was
+    established after recovery.
