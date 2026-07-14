@@ -933,18 +933,15 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 - Why:
   - Address the consolidated PR #4 review blocker and reliability findings
     before moving the External API v1 migration out of draft review.
-- Status: code-complete, full-gate verified, and the refined rotation lifecycle
-  is live-validated on the attached Pixel. Backup policy, the one-time legacy
-  migration notice, and protocol-level plaintext/offline-PIN security remain
-  explicit product/security sign-off items; this pass did not silently choose
-  those policies.
+- Status: complete, full-gate verified, and the refined rotation lifecycle is
+  live-validated on the attached Pixel. Product/security sign-off is resolved:
+  API credentials remain eligible for Android Auto Backup because convenient
+  restore is worth the low risk for this product; no legacy-record migration
+  notice is needed before there are users; and the plaintext LAN/offline-PIN
+  risk is accepted as minimal for a moving-vehicle installation.
 - Next steps:
-  - 1) Commit and push the review fixes to `dev`, then update PR #4 with the
-    adjudication and verification evidence.
-  - 2) Decide whether API credentials should be excluded from Android Auto
-    Backup and whether legacy-record deletion needs a one-time user notice.
-  - 3) Continue the existing deterministic Pi desktop/system routing priority
-    after PR review is clear.
+  - 1) Complete PR #4 review and merge when approved.
+  - 2) Continue the existing deterministic Pi desktop/system routing priority.
 - Verification:
   - Red phase: the focused suite initially failed at the new monitor,
     handshake-timeout, and GPS freshness seams before implementation.
