@@ -61,7 +61,7 @@ object PairingCode {
     private fun canonicalCharacters(raw: String): String? {
         if (raw.any {
                 it != '-' && it != ' ' &&
-                    it.uppercaseChar() !in 'A'..'Z' && it !in '2'..'7'
+                    it !in 'A'..'Z' && it !in 'a'..'z' && it !in '2'..'7'
             }
         ) {
             return null

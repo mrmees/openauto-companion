@@ -48,6 +48,8 @@ class ApiCryptoTest {
         )
         assertNull(PairingCode.normalize("ABCDEFGHIJKLMNOPQRSTUVX0"))
         assertNull(PairingCode.normalize("ABCDEFGHIJKLMNOPQRSTUVW"))
+        assertNull(PairingCode.normalize("\u0131BCDEFGHIJKLMNOPQRSTUVWX"))
+        assertNull(PairingCode.normalize("\u017FBCDEFGHIJKLMNOPQRSTUVWX"))
     }
 
     @Test
@@ -59,6 +61,7 @@ class ApiCryptoTest {
         )
         assertNull(PairingCode.formatInput("ABCD-EFGH-IJKL-MNOP-QRST-UVWX2"))
         assertNull(PairingCode.formatInput("ABCD-EFGH-IJKL-MNOP-QRST-UVX0"))
+        assertNull(PairingCode.formatInput("\u0131BCD"))
     }
 
     @Test
