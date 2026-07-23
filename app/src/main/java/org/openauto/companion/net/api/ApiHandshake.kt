@@ -106,7 +106,10 @@ class ApiHandshake private constructor(
     private fun handlePairingChallenge(challenge: Api.PairingChallenge): Result {
         val pairing = credentials as? Credentials.Pairing
             ?: return terminal("PairingChallenge received for known client")
-        val secret = ApiCrypto.derivePairingSecret(pairing.pin, challenge.salt.toByteArray())
+        if (challenge.secretFormat != Api.PairingSecretFormat.PAIRING_SECRET_FORMAT_BASE32_120) {
+            return terminal("Unsupported pairing secret format: ${challenge.secretFormat}")
+        }
+        val secret = ApiCrypto.derivePairingSecret(pairing.code, challenge.salt.toByteArray())
         pendingPairingSecret = secret
         val proof = ApiCrypto.hmacSha256(secret, challenge.nonce.toByteArray())
         return Result.Send(
@@ -124,6 +127,11 @@ class ApiHandshake private constructor(
     private fun handleServerHello(serverHello: Api.ServerHello): Result {
         state = State.READY
         val paired = if (credentials is Credentials.Pairing) {
+            if (!serverHello.capabilities.hasSecurePairingCode() ||
+                !serverHello.capabilities.securePairingCode
+            ) {
+                return terminal("Server did not confirm secure pairing support")
+            }
             val clientId = if (serverHello.hasGrantedClientId()) serverHello.grantedClientId else ""
             if (clientId.isBlank()) return terminal("Pairing completed without granted client id")
             val secret = pendingPairingSecret
@@ -145,7 +153,7 @@ class ApiHandshake private constructor(
 
     private sealed class Credentials {
         data class KnownClient(val clientId: String, val secret: ByteArray) : Credentials()
-        data class Pairing(val pin: String) : Credentials()
+        data class Pairing(val code: String) : Credentials()
     }
 
     companion object {
@@ -160,10 +168,14 @@ class ApiHandshake private constructor(
             )
         }
 
-        fun pairing(clientName: String, pin: String): ApiHandshake =
-            ApiHandshake(
+        fun pairing(clientName: String, pin: String): ApiHandshake {
+            val canonical = requireNotNull(PairingCode.normalize(pin)) {
+                "pairing code must contain 24 Base32 characters"
+            }
+            return ApiHandshake(
                 clientName = clientName,
-                credentials = Credentials.Pairing(pin = pin)
+                credentials = Credentials.Pairing(code = canonical)
             )
+        }
     }
 }

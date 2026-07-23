@@ -53,12 +53,13 @@ class ApiHandshakeTest {
     }
 
     @Test
-    fun pairingFlow_derivesSecretFromPinAndSaltThenReturnsGrantedCredentials() {
-        val handshake = ApiHandshake.pairing(clientName = "Pixel 9", pin = "123456")
+    fun pairingFlow_derivesSecretFromCodeAndSaltThenReturnsGrantedCredentials() {
+        val code = "ABCDEFGHIJKLMNOPQRSTUVWX"
+        val handshake = ApiHandshake.pairing(clientName = "Pixel 9", pin = code)
         val nonce =
             "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f".hexToBytes()
         val salt = "000102030405060708090a0b0c0d0e0f".hexToBytes()
-        val expectedSecret = ApiCrypto.derivePairingSecret("123456", salt)
+        val expectedSecret = ApiCrypto.derivePairingSecret(code, salt)
 
         val hello = handshake.start()
 
@@ -81,6 +82,26 @@ class ApiHandshakeTest {
         assertEquals(ApiHandshake.State.READY, handshake.state)
         assertEquals("client-new", ready.pairedCredentials?.clientId)
         assertArrayEquals(expectedSecret, ready.pairedCredentials?.secret)
+    }
+
+    @Test
+    fun pairingRejectsChallengeWithoutSecureCodeFormat() {
+        val handshake = ApiHandshake.pairing(
+            clientName = "Pixel 9",
+            pin = "ABCDEFGHIJKLMNOPQRSTUVWX"
+        )
+        handshake.start()
+        val challenge = Api.ApiMessage.newBuilder()
+            .setPairingChallenge(
+                Api.PairingChallenge.newBuilder()
+                    .setNonce(ByteString.copyFrom(ByteArray(32)))
+                    .setSalt(ByteString.copyFrom(ByteArray(16)))
+            )
+            .build()
+
+        val terminal = handshake.handle(challenge)
+        assertTrue(terminal is ApiHandshake.Result.Terminal)
+        assertEquals(ApiHandshake.State.TERMINAL, handshake.state)
     }
 
     @Test
@@ -142,6 +163,7 @@ class ApiHandshakeTest {
                 Api.PairingChallenge.newBuilder()
                     .setNonce(ByteString.copyFrom(nonce))
                     .setSalt(ByteString.copyFrom(salt))
+                    .setSecretFormat(Api.PairingSecretFormat.PAIRING_SECRET_FORMAT_BASE32_120)
                     .build()
             )
             .build()
@@ -153,7 +175,9 @@ class ApiHandshakeTest {
             .setServerName("Prodigy")
             .setAppVersion("v1-test")
             .setSessionId("session-1")
-            .setCapabilities(Api.Capabilities.getDefaultInstance())
+            .setCapabilities(
+                Api.Capabilities.newBuilder().setSecurePairingCode(true).build()
+            )
             .apply {
                 if (grantedClientId != null) setGrantedClientId(grantedClientId)
             }

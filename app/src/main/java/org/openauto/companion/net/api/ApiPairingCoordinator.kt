@@ -55,9 +55,9 @@ class ApiPairingCoordinator(
             FailureKind.INVALID_INPUT,
             "Wi-Fi SSID is required"
         )
-        if (!pin.matches(PIN_PATTERN)) return@coroutineScope failure(
+        val canonicalCode = PairingCode.normalize(pin) ?: return@coroutineScope failure(
             FailureKind.INVALID_INPUT,
-            "PIN must be exactly 6 digits"
+            "Pairing code must contain 24 Base32 characters"
         )
         if (credentialStore.containsSsid(ssid)) return@coroutineScope failure(
             FailureKind.DUPLICATE_SSID,
@@ -89,7 +89,7 @@ class ApiPairingCoordinator(
             val transport = transportFactory(host, draft.tcpPort, socketFactory)
             client = clientFactory(
                 transport,
-                ApiHandshake.pairing(clientName = CLIENT_NAME, pin = pin),
+                ApiHandshake.pairing(clientName = CLIENT_NAME, pin = canonicalCode),
                 this
             )
             when (val connect = client.connect()) {
@@ -186,7 +186,6 @@ class ApiPairingCoordinator(
     }
 
     private companion object {
-        val PIN_PATTERN = Regex("\\d{6}")
         const val CLIENT_NAME = "OpenAuto Companion"
     }
 }

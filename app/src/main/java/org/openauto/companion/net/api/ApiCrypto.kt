@@ -1,16 +1,19 @@
 package org.openauto.companion.net.api
 
 import java.security.MessageDigest
+import java.util.Locale
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 object ApiCrypto {
     const val SECRET_SIZE_BYTES = 32
 
-    fun derivePairingSecret(pin: String, salt: ByteArray): ByteArray {
-        require(pin.matches(Regex("\\d{6}"))) { "PIN must be exactly 6 digits" }
+    fun derivePairingSecret(pairingCode: String, salt: ByteArray): ByteArray {
+        require(PairingCode.normalize(pairingCode) == pairingCode) {
+            "Pairing code must be canonical 120-bit Base32"
+        }
         val digest = MessageDigest.getInstance("SHA-256")
-        digest.update(pin.toByteArray(Charsets.UTF_8))
+        digest.update(pairingCode.toByteArray(Charsets.UTF_8))
         digest.update(salt)
         return digest.digest()
     }
@@ -31,5 +34,23 @@ object ApiCrypto {
         } catch (_: NumberFormatException) {
             null
         }
+    }
+}
+
+object PairingCode {
+    const val CANONICAL_LENGTH = 24
+    const val CREDENTIAL_GENERATION = 2
+    private val PATTERN = Regex("[A-Z2-7]{$CANONICAL_LENGTH}")
+
+    fun normalize(raw: String): String? {
+        val canonical = raw
+            .filterNot { it == '-' || it == ' ' }
+            .uppercase(Locale.US)
+        return canonical.takeIf(PATTERN::matches)
+    }
+
+    fun format(canonical: String): String {
+        require(normalize(canonical) == canonical) { "Pairing code must be canonical" }
+        return canonical.chunked(4).joinToString("-")
     }
 }

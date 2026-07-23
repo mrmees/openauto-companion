@@ -4,9 +4,10 @@ import java.util.UUID
 import org.json.JSONArray
 import org.json.JSONObject
 import org.openauto.companion.net.api.ApiCrypto
+import org.openauto.companion.net.api.PairingCode
 
 object VehicleStorageMigration {
-    const val CURRENT_VERSION = 1
+    const val CURRENT_VERSION = 2
     val LEGACY_KEYS = setOf("shared_secret", "target_ssid", "socks5_enabled")
 
     data class Plan(
@@ -38,19 +39,20 @@ object VehicleStorageMigration {
         return buildList {
             for (index in 0 until array.length()) {
                 val json = array.optJSONObject(index) ?: continue
-                val vehicle = if (storedVersion >= CURRENT_VERSION) {
+                val vehicle = if (storedVersion >= 1) {
                     parseCurrentVehicle(json)
                 } else {
                     parseTransitionalVehicle(json)
                 } ?: continue
-                if (isValidV1(vehicle)) add(vehicle)
+                if (isValidCurrent(vehicle)) add(vehicle)
             }
         }
     }
 
-    fun isValidV1(vehicle: Vehicle): Boolean =
+    fun isValidCurrent(vehicle: Vehicle): Boolean =
         vehicle.apiClientId.isNotBlank() &&
-            ApiCrypto.decodeSecretHex(vehicle.apiSecretHex) != null
+            ApiCrypto.decodeSecretHex(vehicle.apiSecretHex) != null &&
+            vehicle.apiCredentialGeneration == PairingCode.CREDENTIAL_GENERATION
 
     private fun parseCurrentVehicle(json: JSONObject): Vehicle? = try {
         Vehicle.fromJson(json)
@@ -69,6 +71,10 @@ object VehicleStorageMigration {
                 name = json.optString("name", ssid).ifBlank { ssid },
                 apiClientId = json.getString("api_client_id").trim(),
                 apiSecretHex = json.getString("api_secret_hex").trim(),
+                apiCredentialGeneration = json.optInt(
+                    "api_credential_generation",
+                    Vehicle.LEGACY_API_CREDENTIAL_GENERATION
+                ),
                 serverId = json.optString("server_id", "").trim().ifBlank { null },
                 apiTcpPort = json.optionalInt("api_tcp_port") ?: Vehicle.DEFAULT_API_TCP_PORT,
                 socks5Enabled = json.optBoolean("socks5_enabled", true),
