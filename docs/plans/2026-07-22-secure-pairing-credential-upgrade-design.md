@@ -1,7 +1,7 @@
 # Secure Pairing Credential Upgrade — Design
 
 Date: 2026-07-22
-Status: ACTIVE
+Status: COMPLETED 2026-07-22
 Grounded on: `origin/main` at `1a7c985761992501547e8547e94ca4f3d838b93d`
 Coordinated head-unit baseline: `openauto-prodigy`
 `42f6aa4344fec17f275122cdf76ced8a6fb3b369`

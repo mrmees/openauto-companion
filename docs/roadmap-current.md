@@ -4,6 +4,17 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
 
 ## Recently Completed
 
+- Secure pairing credential upgrade — completed and live-validated 2026-07-22
+  with the coordinated Prodigy API/core wave.
+  - QR-first pairing now uses an explicitly versioned 24-character Base32 code
+    with 120 random bits; manual input shares the same ASCII-only normalizer.
+  - Storage version 2 retired the Pixel's legacy record, pairing persisted one
+    generation-2 vehicle, and force-stop/relaunch reached READY with the saved
+    credential while reports, SOCKS state, and Android Auto continued normally.
+  - Design and plan remain as completed history in
+    `docs/plans/2026-07-22-secure-pairing-credential-upgrade-design.md` and
+    `docs/plans/2026-07-22-secure-pairing-credential-upgrade-plan.md`.
+
 - External API v1 companion cutover — completed and live-validated 2026-07-13.
   - Manual PIN pairing, stored-client reconnect, time/GPS/battery/connectivity
     reports, immediate bridge toggling, owner clearing, and replay all passed
@@ -20,15 +31,6 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
     This passed after Prodigy fixed real-socket terminal-frame flushing.
 
 ## Now
-
-- Secure pairing credential upgrade — **ACTIVE 2026-07-22**, coordinated with
-  Prodigy's API/core asynchronous lifecycle wave. QR-first pairing moves from
-  a six-digit offline-enumerable secret to a versioned 120-bit random Base32
-  code; old credentials are retired once and re-paired. The branch also carries
-  the already live-validated airplane-mode recovery commit so the coordinated
-  APK does not regress deployed reconnect behavior. Design and plan:
-  `docs/plans/2026-07-22-secure-pairing-credential-upgrade-design.md` and
-  `docs/plans/2026-07-22-secure-pairing-credential-upgrade-plan.md`.
 
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
   - Rationale: this is the highest-priority product goal for the next 60 days.

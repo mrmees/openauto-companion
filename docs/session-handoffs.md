@@ -41,6 +41,49 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-22 20:44 (local)
+
+- What changed:
+  - Replaced six-digit pairing with the coordinated versioned 24-character
+    Base32 credential contract, including ASCII-only normalization, QR
+    `code=` parsing, challenge/capability negotiation, and shared crypto vectors.
+  - Added credential-generation persistence and storage version 2, which
+    retires legacy vehicles instead of attempting an insecure compatibility
+    path.
+  - Updated QR/manual pairing UI and retained the previously live-validated
+    per-attempt Wi-Fi network recovery change as an explicit branch commit.
+- Why:
+  - A captured six-digit pairing transcript was cheaply enumerable offline;
+    Prodigy and Companion needed one coordinated, fail-closed credential
+    generation upgrade.
+- Status: done
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: coordinated Prodigy secure
+    pairing fields, generation enforcement, and deployment in its API/core
+    asynchronous lifecycle wave.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Publish this branch as a separate draft PR to `main`.
+  - 2) Review and merge it together with the matching Prodigy draft PR.
+  - 3) Continue the existing Companion roadmap after the coordinated merge.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - Prodigy and Companion API proto files -> byte-identical
+    - `git diff --check` -> PASS
+    - Repository review -> one confirmed normalization edge fixed; full rerun
+      LGTM
+    - Pixel upgrade -> PASS; legacy record retired and storage version 2 saved
+    - QR pairing and generation-2 persistence -> PASS
+    - Force-stop/relaunch saved-client reconnect -> PASS without manual entry
+    - Battery/GPS/connectivity reports and stable SOCKS route -> PASS
+  - AA stream continuity: preserved; Prodigy remained connected with H.265
+
+---
+
 ## 2026-07-08 11:22 (local)
 
 - What changed:
