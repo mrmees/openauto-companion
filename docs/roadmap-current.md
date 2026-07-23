@@ -21,6 +21,15 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
 
 ## Now
 
+- Secure pairing credential upgrade — **ACTIVE 2026-07-22**, coordinated with
+  Prodigy's API/core asynchronous lifecycle wave. QR-first pairing moves from
+  a six-digit offline-enumerable secret to a versioned 120-bit random Base32
+  code; old credentials are retired once and re-paired. The branch also carries
+  the already live-validated airplane-mode recovery commit so the coordinated
+  APK does not regress deployed reconnect behavior. Design and plan:
+  `docs/plans/2026-07-22-secure-pairing-credential-upgrade-design.md` and
+  `docs/plans/2026-07-22-secure-pairing-credential-upgrade-plan.md`.
+
 - SOCKS5 Bridging: deliver companion-side internet bridge MVP, then stabilize reconnect behavior.
   - Rationale: this is the highest-priority product goal for the next 60 days.
   - Dependency check: if head-unit changes are required, log them under `Blocked by Head Unit` in `docs/project-vision.md` before proceeding past the boundary.
