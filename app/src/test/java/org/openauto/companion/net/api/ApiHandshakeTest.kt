@@ -55,7 +55,7 @@ class ApiHandshakeTest {
     @Test
     fun pairingFlow_derivesSecretFromCodeAndSaltThenReturnsGrantedCredentials() {
         val code = "ABCDEFGHIJKLMNOPQRSTUVWX"
-        val handshake = ApiHandshake.pairing(clientName = "Pixel 9", pin = code)
+        val handshake = ApiHandshake.pairing(clientName = "Pixel 9", pairingCode = code)
         val nonce =
             "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f".hexToBytes()
         val salt = "000102030405060708090a0b0c0d0e0f".hexToBytes()
@@ -88,7 +88,7 @@ class ApiHandshakeTest {
     fun pairingRejectsChallengeWithoutSecureCodeFormat() {
         val handshake = ApiHandshake.pairing(
             clientName = "Pixel 9",
-            pin = "ABCDEFGHIJKLMNOPQRSTUVWX"
+            pairingCode = "ABCDEFGHIJKLMNOPQRSTUVWX"
         )
         handshake.start()
         val challenge = Api.ApiMessage.newBuilder()

@@ -138,7 +138,7 @@ private fun VehicleRow(
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
             title = { Text("Remove ${vehicle.name}?") },
-            text = { Text("This will unpair this vehicle. You can re-pair later with a new PIN.") },
+            text = { Text("This will unpair this vehicle. You can re-pair later with a new pairing code.") },
             confirmButton = {
                 TextButton(onClick = { showDeleteDialog = false; onRemove() }) {
                     Text("Remove", color = MaterialTheme.colorScheme.error)

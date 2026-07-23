@@ -51,6 +51,17 @@ class ApiCryptoTest {
     }
 
     @Test
+    fun pairingCode_formatsPartialManualInputAndRejectsInvalidCharactersOrOverflow() {
+        assertEquals("ABCD-EFGH-IJKL", PairingCode.formatInput("abcd efgh-ijkl"))
+        assertEquals(
+            "ABCD-EFGH-IJKL-MNOP-QRST-UVWX",
+            PairingCode.formatInput("abcdefghijklmnopqrstuvwx")
+        )
+        assertNull(PairingCode.formatInput("ABCD-EFGH-IJKL-MNOP-QRST-UVWX2"))
+        assertNull(PairingCode.formatInput("ABCD-EFGH-IJKL-MNOP-QRST-UVX0"))
+    }
+
+    @Test
     fun decodeSecretHex_acceptsExactlyThirtyTwoBytes() {
         val hex = "aa".repeat(32)
 

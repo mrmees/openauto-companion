@@ -168,8 +168,8 @@ class ApiHandshake private constructor(
             )
         }
 
-        fun pairing(clientName: String, pin: String): ApiHandshake {
-            val canonical = requireNotNull(PairingCode.normalize(pin)) {
+        fun pairing(clientName: String, pairingCode: String): ApiHandshake {
+            val canonical = requireNotNull(PairingCode.normalize(pairingCode)) {
                 "pairing code must contain 24 Base32 characters"
             }
             return ApiHandshake(

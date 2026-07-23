@@ -49,13 +49,13 @@ class ApiPairingCoordinator(
         data object Cancelled : Result
     }
 
-    suspend fun pair(draft: ApiPairingDraft, pin: String): Result = coroutineScope {
+    suspend fun pair(draft: ApiPairingDraft, pairingCode: String): Result = coroutineScope {
         val ssid = draft.ssid.trim()
         if (ssid.isBlank()) return@coroutineScope failure(
             FailureKind.INVALID_INPUT,
             "Wi-Fi SSID is required"
         )
-        val canonicalCode = PairingCode.normalize(pin) ?: return@coroutineScope failure(
+        val canonicalCode = PairingCode.normalize(pairingCode) ?: return@coroutineScope failure(
             FailureKind.INVALID_INPUT,
             "Pairing code must contain 24 Base32 characters"
         )
@@ -89,7 +89,7 @@ class ApiPairingCoordinator(
             val transport = transportFactory(host, draft.tcpPort, socketFactory)
             client = clientFactory(
                 transport,
-                ApiHandshake.pairing(clientName = CLIENT_NAME, pin = canonicalCode),
+                ApiHandshake.pairing(clientName = CLIENT_NAME, pairingCode = canonicalCode),
                 this
             )
             when (val connect = client.connect()) {

@@ -6,8 +6,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import org.openauto.companion.net.api.PairingCode
 
 sealed interface PairingUiState {
     data object Idle : PairingUiState
@@ -15,18 +17,27 @@ sealed interface PairingUiState {
     data class Failed(val message: String) : PairingUiState
 }
 
+internal fun canSubmitManualPairing(
+    ssid: String,
+    pairingCodeInput: String,
+    pairingInProgress: Boolean
+): Boolean = !pairingInProgress &&
+    ssid.trim().isNotEmpty() &&
+    PairingCode.normalize(pairingCodeInput) != null
+
 @Composable
 fun PairingScreen(
     suggestedSsid: String = "",
     state: PairingUiState,
-    onPair: (ssid: String, name: String, pin: String) -> Unit,
+    onPair: (ssid: String, name: String, pairingCode: String) -> Unit,
     onScanQr: () -> Unit,
     onCancel: (() -> Unit)? = null
 ) {
     var ssid by remember { mutableStateOf(suggestedSsid) }
     var name by remember { mutableStateOf("") }
-    var pin by remember { mutableStateOf("") }
+    var pairingCodeInput by remember { mutableStateOf("") }
     val pairing = state is PairingUiState.Pairing
+    val canonicalPairingCode = PairingCode.normalize(pairingCodeInput)
 
     Column(
         modifier = Modifier
@@ -37,7 +48,7 @@ fun PairingScreen(
     ) {
         Text("Add Vehicle", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
-        Text("Scan the QR code on your head unit, or enter its WiFi details and PIN manually.")
+        Text("Scan the QR code on your head unit, or enter its WiFi details and pairing code manually.")
         Spacer(modifier = Modifier.height(20.dp))
 
         FilledTonalButton(
@@ -81,13 +92,19 @@ fun PairingScreen(
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
-            value = pin,
-            onValueChange = { if (it.length <= 6 && it.all { c -> c.isDigit() }) pin = it },
-            label = { Text("PIN") },
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            value = pairingCodeInput,
+            onValueChange = { input ->
+                PairingCode.formatInput(input)?.let { pairingCodeInput = it }
+            },
+            label = { Text("Pairing Code") },
+            placeholder = { Text("XXXX-XXXX-XXXX-XXXX-XXXX-XXXX") },
+            keyboardOptions = KeyboardOptions(
+                capitalization = KeyboardCapitalization.Characters,
+                keyboardType = KeyboardType.Ascii
+            ),
             singleLine = true,
             enabled = !pairing,
-            modifier = Modifier.width(200.dp)
+            modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -99,8 +116,14 @@ fun PairingScreen(
                 }
             }
             Button(
-                onClick = { onPair(ssid.trim(), name.trim().ifEmpty { ssid.trim() }, pin) },
-                enabled = !pairing && pin.length == 6 && ssid.trim().isNotEmpty()
+                onClick = {
+                    onPair(
+                        ssid.trim(),
+                        name.trim().ifEmpty { ssid.trim() },
+                        checkNotNull(canonicalPairingCode)
+                    )
+                },
+                enabled = canSubmitManualPairing(ssid, pairingCodeInput, pairing)
             ) {
                 if (pairing) {
                     CircularProgressIndicator(

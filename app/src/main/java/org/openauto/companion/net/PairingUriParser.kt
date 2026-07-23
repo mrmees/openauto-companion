@@ -11,10 +11,7 @@ data class PairingPayload(
     val webSocketPort: Int,
     val code: String,
     val ssid: String
-) {
-    // Transitional source alias removed by the UI task in this same wave.
-    val pin: String get() = code
-}
+)
 
 object PairingUriParser {
     fun parse(raw: String): PairingPayload? {

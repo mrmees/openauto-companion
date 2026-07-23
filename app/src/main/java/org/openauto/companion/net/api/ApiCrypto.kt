@@ -43,14 +43,31 @@ object PairingCode {
     private val PATTERN = Regex("[A-Z2-7]{$CANONICAL_LENGTH}")
 
     fun normalize(raw: String): String? {
-        val canonical = raw
-            .filterNot { it == '-' || it == ' ' }
-            .uppercase(Locale.US)
+        val canonical = canonicalCharacters(raw) ?: return null
         return canonical.takeIf(PATTERN::matches)
     }
 
     fun format(canonical: String): String {
         require(normalize(canonical) == canonical) { "Pairing code must be canonical" }
         return canonical.chunked(4).joinToString("-")
+    }
+
+    fun formatInput(raw: String): String? {
+        val canonical = canonicalCharacters(raw) ?: return null
+        if (canonical.length > CANONICAL_LENGTH) return null
+        return canonical.chunked(4).joinToString("-")
+    }
+
+    private fun canonicalCharacters(raw: String): String? {
+        if (raw.any {
+                it != '-' && it != ' ' &&
+                    it.uppercaseChar() !in 'A'..'Z' && it !in '2'..'7'
+            }
+        ) {
+            return null
+        }
+        return raw
+            .filterNot { it == '-' || it == ' ' }
+            .uppercase(Locale.US)
     }
 }

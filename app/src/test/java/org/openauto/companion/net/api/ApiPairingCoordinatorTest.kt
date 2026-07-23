@@ -30,15 +30,15 @@ class ApiPairingCoordinatorTest {
 
         val blankSsid = harness.coordinator.pair(
             ApiPairingDraft(ssid = "  ", displayName = "Car", host = "10.0.0.1"),
-            pin = VALID_PAIRING_CODE
+            pairingCode = VALID_PAIRING_CODE
         )
-        val invalidPin = harness.coordinator.pair(
+        val invalidCode = harness.coordinator.pair(
             ApiPairingDraft(ssid = "NewAP", displayName = "Car", host = "10.0.0.1"),
-            pin = "ABCDEFGHIJKLMNOPQRSTUVW"
+            pairingCode = "ABCDEFGHIJKLMNOPQRSTUVW"
         )
         val duplicate = harness.coordinator.pair(
             ApiPairingDraft(ssid = "ExistingAP", displayName = "Car", host = "10.0.0.1"),
-            pin = VALID_PAIRING_CODE
+            pairingCode = VALID_PAIRING_CODE
         )
         val invalidPort = harness.coordinator.pair(
             ApiPairingDraft(
@@ -47,11 +47,11 @@ class ApiPairingCoordinatorTest {
                 host = "10.0.0.1",
                 tcpPort = 0
             ),
-            pin = VALID_PAIRING_CODE
+            pairingCode = VALID_PAIRING_CODE
         )
 
         assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, blankSsid)
-        assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, invalidPin)
+        assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, invalidCode)
         assertFailureKind(ApiPairingCoordinator.FailureKind.DUPLICATE_SSID, duplicate)
         assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, invalidPort)
         assertEquals(0, harness.resolveCalls)
@@ -76,7 +76,7 @@ class ApiPairingCoordinatorTest {
                 host = "10.0.0.42",
                 tcpPort = 19810
             ),
-            pin = VALID_PAIRING_CODE
+            pairingCode = VALID_PAIRING_CODE
         )
 
         assertTrue(result is ApiPairingCoordinator.Result.Success)
@@ -106,7 +106,7 @@ class ApiPairingCoordinatorTest {
 
         harness.coordinator.pair(
             ApiPairingDraft(ssid = "ProdigyAP", displayName = "Car", host = "  "),
-            pin = VALID_PAIRING_CODE
+            pairingCode = VALID_PAIRING_CODE
         )
 
         assertEquals(ApiTcpTransport.DEFAULT_HOST, harness.transportHost)
@@ -125,7 +125,10 @@ class ApiPairingCoordinatorTest {
             val client = FakePairingClient(connectResult = ready)
             val harness = Harness(clientProvider = { client })
 
-            val result = harness.coordinator.pair(draft(), pin = VALID_PAIRING_CODE)
+            val result = harness.coordinator.pair(
+                draft(),
+                pairingCode = VALID_PAIRING_CODE
+            )
 
             assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_READY, result)
             assertNull(harness.savedVehicles)
@@ -149,7 +152,10 @@ class ApiPairingCoordinatorTest {
         outcomes.forEach { (client, expectedKind) ->
             val harness = Harness(clientProvider = { client })
 
-            val result = harness.coordinator.pair(draft(), pin = VALID_PAIRING_CODE)
+            val result = harness.coordinator.pair(
+                draft(),
+                pairingCode = VALID_PAIRING_CODE
+            )
 
             assertFailureKind(expectedKind, result)
             assertNull(harness.savedVehicles)
@@ -174,7 +180,10 @@ class ApiPairingCoordinatorTest {
                 clientProvider = { FakePairingClient(connectResult = rejected) }
             )
 
-            val result = harness.coordinator.pair(draft(), pin = VALID_PAIRING_CODE)
+            val result = harness.coordinator.pair(
+                draft(),
+                pairingCode = VALID_PAIRING_CODE
+            )
 
             assertFailureKind(ApiPairingCoordinator.FailureKind.PAIRING_WINDOW_CLOSED, result)
             assertEquals(
@@ -189,7 +198,7 @@ class ApiPairingCoordinatorTest {
     fun missingWifiFailsBeforeTransportCreation() = runTest {
         val harness = Harness(resolveSocketFactory = { _, _ -> null })
 
-        val result = harness.coordinator.pair(draft(), pin = VALID_PAIRING_CODE)
+        val result = harness.coordinator.pair(draft(), pairingCode = VALID_PAIRING_CODE)
 
         assertFailureKind(ApiPairingCoordinator.FailureKind.WIFI_NOT_FOUND, result)
         assertEquals(0, harness.transportCalls)
@@ -201,7 +210,7 @@ class ApiPairingCoordinatorTest {
         val client = FakePairingClient(connectError = CancellationException("cancelled"))
         val harness = Harness(clientProvider = { client })
 
-        val result = harness.coordinator.pair(draft(), pin = VALID_PAIRING_CODE)
+        val result = harness.coordinator.pair(draft(), pairingCode = VALID_PAIRING_CODE)
 
         assertEquals(ApiPairingCoordinator.Result.Cancelled, result)
         assertNull(harness.savedVehicles)
