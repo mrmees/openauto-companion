@@ -48,13 +48,14 @@ class ApiSessionClientTest {
         val nonce =
             "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f".hexToBytes()
         val salt = "000102030405060708090a0b0c0d0e0f".hexToBytes()
-        val expectedSecret = ApiCrypto.derivePairingSecret("123456", salt)
+        val code = "ABCDEFGHIJKLMNOPQRSTUVWX"
+        val expectedSecret = ApiCrypto.derivePairingSecret(code, salt)
         val transport = FakeTransport(
             listOf(pairingChallenge(nonce, salt), serverHello(grantedClientId = "client-new"))
         )
         val client = ApiSessionClient(
             transport = transport,
-            handshake = ApiHandshake.pairing("Pixel 9", "123456"),
+            handshake = ApiHandshake.pairing("Pixel 9", code),
             scope = backgroundScope
         )
 
@@ -442,6 +443,7 @@ class ApiSessionClientTest {
                 Api.PairingChallenge.newBuilder()
                     .setNonce(ByteString.copyFrom(nonce))
                     .setSalt(ByteString.copyFrom(salt))
+                    .setSecretFormat(Api.PairingSecretFormat.PAIRING_SECRET_FORMAT_BASE32_120)
                     .build()
             )
             .build()
@@ -455,7 +457,9 @@ class ApiSessionClientTest {
                     .setServerName("Prodigy")
                     .setAppVersion("v1-test")
                     .setSessionId("session-1")
-                    .setCapabilities(Api.Capabilities.getDefaultInstance())
+                    .setCapabilities(
+                        Api.Capabilities.newBuilder().setSecurePairingCode(true).build()
+                    )
                     .apply {
                         if (grantedClientId != null) setGrantedClientId(grantedClientId)
                     }

@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
                 var showPairingSuccess by remember { mutableStateOf<String?>(null) }
                 var pairingState by remember { mutableStateOf<PairingUiState>(PairingUiState.Idle) }
 
-                val startPairing: (ApiPairingDraft, String) -> Unit = start@{ draft, pin ->
+                val startPairing: (ApiPairingDraft, String) -> Unit = start@{ draft, pairingCode ->
                     if (pairingState is PairingUiState.Pairing) return@start
                     pairingState = PairingUiState.Pairing
                     lifecycleScope.launch {
@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         )
-                        when (val result = coordinator.pair(draft, pin = pin)) {
+                        when (val result = coordinator.pair(draft, pairingCode = pairingCode)) {
                             is ApiPairingCoordinator.Result.Success -> {
                                 vehicles = prefs.vehicles
                                 restartMonitoring()
@@ -163,10 +163,10 @@ class MainActivity : ComponentActivity() {
                         }
                         PairingScreen(
                             state = pairingState,
-                            onPair = { ssid, name, pin ->
+                            onPair = { ssid, name, pairingCode ->
                                 startPairing(
                                     ApiPairingDraft(ssid = ssid, displayName = name),
-                                    pin
+                                    pairingCode
                                 )
                             },
                             onScanQr = { screen = Screen.QrScan },
@@ -190,7 +190,7 @@ class MainActivity : ComponentActivity() {
                                         host = payload.host,
                                         tcpPort = payload.tcpPort
                                     ),
-                                    payload.pin
+                                    payload.code
                                 )
                             },
                             onCancel = { screen = Screen.Pairing }

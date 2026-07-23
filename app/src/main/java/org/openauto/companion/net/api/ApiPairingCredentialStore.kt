@@ -45,6 +45,7 @@ class ApiPairingCredentialStore(
             name = displayName.trim().ifBlank { normalizedSsid },
             apiClientId = clientId,
             apiSecretHex = ApiCrypto.toHex(credentials.secret),
+            apiCredentialGeneration = PairingCode.CREDENTIAL_GENERATION,
             serverId = serverId,
             apiTcpPort = tcpPort,
             settingsHost = normalizedHost

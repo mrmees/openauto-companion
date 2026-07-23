@@ -2,8 +2,17 @@ package org.openauto.companion.net
 
 import android.net.Network
 import java.net.Socket
+import java.net.SocketException
 
 object NetworkSocketFactory {
+    fun forRequiredNetwork(
+        networkProvider: () -> Network?
+    ): () -> Socket = createRequiredBoundFactory {
+        networkProvider()?.let { network ->
+            { network.socketFactory.createSocket() }
+        }
+    }
+
     fun forNetwork(
         network: Network?,
         unboundFactory: () -> Socket = { Socket() },
@@ -18,6 +27,14 @@ object NetworkSocketFactory {
                 onFallback = onFallback
             )
         }
+    }
+
+    internal fun createRequiredBoundFactory(
+        boundFactoryProvider: () -> (() -> Socket)?
+    ): () -> Socket = {
+        val boundFactory = boundFactoryProvider()
+            ?: throw SocketException("Matched Wi-Fi network is unavailable")
+        boundFactory()
     }
 
     internal fun createWithFallback(

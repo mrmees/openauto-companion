@@ -9,6 +9,24 @@ import org.junit.Test
 
 class VehicleStorageMigrationTest {
     @Test
+    fun versionOneCredentialsAreRetiredDuringSecurityUpgrade() {
+        val weakRecord = validV1Json().remove("api_credential_generation")
+        val plan = VehicleStorageMigration.plan(
+            storedVersion = 1,
+            rawVehiclesJson = JSONArray().put(weakRecord).toString()
+        )!!
+
+        assertEquals(VehicleStorageMigration.CURRENT_VERSION, plan.targetVersion)
+        assertTrue(
+            VehicleStorageMigration.activeVehicles(
+                plan.vehiclesJson,
+                storedVersion = plan.targetVersion
+            ).isEmpty()
+        )
+        assertEquals(plan, VehicleStorageMigration.plan(1, JSONArray().put(weakRecord).toString()))
+    }
+
+    @Test
     fun planDeletesLegacyRecordsAndPreservesCompleteV1Records() {
         val legacy = JSONObject()
             .put("id", "legacy")
@@ -130,4 +148,5 @@ class VehicleStorageMigrationTest {
         .put("api_mode", "external_api_v1")
         .put("api_client_id", "client-123")
         .put("api_secret_hex", "ab".repeat(32))
+        .put("api_credential_generation", 2)
 }

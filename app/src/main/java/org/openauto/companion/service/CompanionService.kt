@@ -44,6 +44,7 @@ import org.openauto.companion.net.CellularUpstreamMonitor
 import org.openauto.companion.net.NetworkSocketFactory
 import org.openauto.companion.net.Socks5Server
 import org.openauto.companion.net.ThemeTransfer
+import org.openauto.companion.net.WifiNetworkResolver
 import org.openauto.companion.net.api.ApiCrypto
 import org.openauto.companion.net.api.ApiHandshake
 import org.openauto.companion.net.api.ApiPairingCredentialStore
@@ -140,6 +141,7 @@ class CompanionService : Service() {
             ?: return null
         return RuntimeConfig(
             vehicleIdentity = vehicleIdentity,
+            vehicleSsid = vehicleSsid,
             vehicleName = intent?.getStringExtra(EXTRA_VEHICLE_NAME)
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
@@ -197,6 +199,7 @@ class CompanionService : Service() {
                 loadVehicles = { CompanionPrefs(this@CompanionService).vehicles },
                 saveVehicles = { CompanionPrefs(this@CompanionService).vehicles = it }
             )
+            val wifiNetworkResolver = WifiNetworkResolver(this@CompanionService)
             val clientScope = this
             val runtime = ApiRuntimeLoop(
                 clientFactory = {
@@ -204,15 +207,9 @@ class CompanionService : Service() {
                         transport = ApiTcpTransport(
                             host = config.host,
                             port = config.tcpPort,
-                            socketFactory = NetworkSocketFactory.forNetwork(
-                                config.wifiNetwork,
-                                onFallback = {
-                                    Log.w(
-                                        TAG,
-                                        "Wi-Fi-bound API v1 socket was denied; retrying this socket unbound"
-                                    )
-                                }
-                            )
+                            socketFactory = NetworkSocketFactory.forRequiredNetwork {
+                                wifiNetworkResolver.resolve(config.vehicleSsid, config.host)
+                            }
                         ),
                         handshake = ApiHandshake.knownClient(
                             clientName = CLIENT_NAME,
@@ -629,6 +626,7 @@ class CompanionService : Service() {
 
     private data class RuntimeConfig(
         val vehicleIdentity: String,
+        val vehicleSsid: String,
         val vehicleName: String,
         val apiClientId: String,
         val apiSecret: ByteArray,

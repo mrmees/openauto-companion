@@ -33,6 +33,7 @@ class ApiPairingCredentialStoreTest {
         assertEquals("My Car", vehicle.name)
         assertEquals("client-123", vehicle.apiClientId)
         assertEquals(ApiCrypto.toHex(secret), vehicle.apiSecretHex)
+        assertEquals(PairingCode.CREDENTIAL_GENERATION, vehicle.apiCredentialGeneration)
         assertEquals("server-uuid-1", vehicle.serverId)
         assertEquals(19810, vehicle.apiTcpPort)
         assertEquals("10.0.0.42", vehicle.settingsHost)

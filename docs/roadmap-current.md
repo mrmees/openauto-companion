@@ -4,6 +4,17 @@ Governance: capture new ideas in `docs/wishlist.md`; only promoted items should 
 
 ## Recently Completed
 
+- Secure pairing credential upgrade — completed and live-validated 2026-07-22
+  with the coordinated Prodigy API/core wave.
+  - QR-first pairing now uses an explicitly versioned 24-character Base32 code
+    with 120 random bits; manual input shares the same ASCII-only normalizer.
+  - Storage version 2 retired the Pixel's legacy record, pairing persisted one
+    generation-2 vehicle, and force-stop/relaunch reached READY with the saved
+    credential while reports, SOCKS state, and Android Auto continued normally.
+  - Design and plan remain as completed history in
+    `docs/plans/2026-07-22-secure-pairing-credential-upgrade-design.md` and
+    `docs/plans/2026-07-22-secure-pairing-credential-upgrade-plan.md`.
+
 - External API v1 companion cutover — completed and live-validated 2026-07-13.
   - Manual PIN pairing, stored-client reconnect, time/GPS/battery/connectivity
     reports, immediate bridge toggling, owner clearing, and replay all passed

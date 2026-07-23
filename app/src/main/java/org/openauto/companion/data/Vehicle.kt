@@ -3,6 +3,7 @@ package org.openauto.companion.data
 import org.json.JSONArray
 import org.json.JSONObject
 import org.openauto.companion.net.api.ApiCrypto
+import org.openauto.companion.net.api.PairingCode
 import java.util.UUID
 
 data class Vehicle(
@@ -11,6 +12,7 @@ data class Vehicle(
     val name: String = ssid,
     val apiClientId: String,
     val apiSecretHex: String,
+    val apiCredentialGeneration: Int = PairingCode.CREDENTIAL_GENERATION,
     val serverId: String? = null,
     val apiTcpPort: Int = DEFAULT_API_TCP_PORT,
     val socks5Enabled: Boolean = true,
@@ -35,6 +37,7 @@ data class Vehicle(
         put("name", name)
         put("api_client_id", apiClientId)
         put("api_secret_hex", apiSecretHex)
+        put("api_credential_generation", apiCredentialGeneration)
         if (!serverId.isNullOrBlank()) put("server_id", serverId)
         put("api_tcp_port", apiTcpPort)
         put("socks5_enabled", socks5Enabled)
@@ -57,6 +60,10 @@ data class Vehicle(
                 name = json.optString("name", ssid).ifBlank { ssid },
                 apiClientId = json.getString("api_client_id").trim(),
                 apiSecretHex = json.getString("api_secret_hex").trim(),
+                apiCredentialGeneration = json.optInt(
+                    "api_credential_generation",
+                    LEGACY_API_CREDENTIAL_GENERATION
+                ),
                 serverId = json.optString("server_id", "").trim().ifBlank { null },
                 apiTcpPort = json.optionalInt("api_tcp_port") ?: DEFAULT_API_TCP_PORT,
                 socks5Enabled = json.optBoolean("socks5_enabled", true),
@@ -82,5 +89,6 @@ data class Vehicle(
 
         const val MAX_VEHICLES = 20
         const val DEFAULT_API_TCP_PORT = 9810
+        const val LEGACY_API_CREDENTIAL_GENERATION = 1
     }
 }

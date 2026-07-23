@@ -7,13 +7,16 @@ import org.junit.Test
 
 class ApiCryptoTest {
     @Test
-    fun derivePairingSecret_hashesPinBytesThenSalt() {
-        val salt = "000102030405060708090a0b0c0d0e0f".hexToBytes()
+    fun derivePairingSecret_matchesSharedSecureCodeVector() {
+        val salt = "0123456789abcdef".toByteArray()
 
-        val secret = ApiCrypto.derivePairingSecret(pin = "123456", salt = salt)
+        val secret = ApiCrypto.derivePairingSecret(
+            pairingCode = "ABCDEFGHIJKLMNOPQRSTUVWX",
+            salt = salt
+        )
 
         assertEquals(
-            "9b6b8bbdd36470ae0f82133563f749881a5453650e7062fd8ddb97a9b19d7778",
+            "9786e3d8dd45530435cc5b09d71e93b76dccf0e3e402ae7af5bdb6400a5c1472",
             ApiCrypto.toHex(secret)
         )
     }
@@ -21,16 +24,44 @@ class ApiCryptoTest {
     @Test
     fun hmacSha256_usesServerNonceBytes() {
         val secret =
-            "9b6b8bbdd36470ae0f82133563f749881a5453650e7062fd8ddb97a9b19d7778".hexToBytes()
+            "9786e3d8dd45530435cc5b09d71e93b76dccf0e3e402ae7af5bdb6400a5c1472".hexToBytes()
         val serverNonce =
             "101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f".hexToBytes()
 
         val proof = ApiCrypto.hmacSha256(secret, serverNonce)
 
         assertEquals(
-            "bfe897455a79edbf71ffcaa736c495bd76ccbce899875b93bf43ae969f6eac85",
+            "b55022f1f823e77b5d0117e45a905e3bc5cc87b7ef0a25090d01fa85191711d6",
             ApiCrypto.toHex(proof)
         )
+    }
+
+    @Test
+    fun pairingCode_normalizesOnlyBase32WithVisualSeparators() {
+        assertEquals(
+            "ABCDEFGHIJKLMNOPQRSTUVWX",
+            PairingCode.normalize("abcd-efgh-ijkl-mnop-qrst-uvwx")
+        )
+        assertEquals(
+            "ABCD-EFGH-IJKL-MNOP-QRST-UVWX",
+            PairingCode.format("ABCDEFGHIJKLMNOPQRSTUVWX")
+        )
+        assertNull(PairingCode.normalize("ABCDEFGHIJKLMNOPQRSTUVX0"))
+        assertNull(PairingCode.normalize("ABCDEFGHIJKLMNOPQRSTUVW"))
+        assertNull(PairingCode.normalize("\u0131BCDEFGHIJKLMNOPQRSTUVWX"))
+        assertNull(PairingCode.normalize("\u017FBCDEFGHIJKLMNOPQRSTUVWX"))
+    }
+
+    @Test
+    fun pairingCode_formatsPartialManualInputAndRejectsInvalidCharactersOrOverflow() {
+        assertEquals("ABCD-EFGH-IJKL", PairingCode.formatInput("abcd efgh-ijkl"))
+        assertEquals(
+            "ABCD-EFGH-IJKL-MNOP-QRST-UVWX",
+            PairingCode.formatInput("abcdefghijklmnopqrstuvwx")
+        )
+        assertNull(PairingCode.formatInput("ABCD-EFGH-IJKL-MNOP-QRST-UVWX2"))
+        assertNull(PairingCode.formatInput("ABCD-EFGH-IJKL-MNOP-QRST-UVX0"))
+        assertNull(PairingCode.formatInput("\u0131BCD"))
     }
 
     @Test

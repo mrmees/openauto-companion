@@ -18,7 +18,7 @@ class CompanionPrefs(context: Context) {
             storedVersion = prefs.getInt(KEY_STORAGE_VERSION, 0)
         )
         set(value) {
-            val valid = value.filter(VehicleStorageMigration::isValidV1)
+            val valid = value.filter(VehicleStorageMigration::isValidCurrent)
             prefs.edit().putString(KEY_VEHICLES, Vehicle.listToJson(valid)).apply()
         }
 
@@ -30,7 +30,7 @@ class CompanionPrefs(context: Context) {
         vehicles.any { it.id == vehicle.id || it.ssid == vehicle.ssid }
 
     fun addVehicle(vehicle: Vehicle): Boolean {
-        if (!VehicleStorageMigration.isValidV1(vehicle)) return false
+        if (!VehicleStorageMigration.isValidCurrent(vehicle)) return false
         val current = vehicles
         if (current.size >= Vehicle.MAX_VEHICLES) return false
         if (isDuplicateVehicle(vehicle)) return false

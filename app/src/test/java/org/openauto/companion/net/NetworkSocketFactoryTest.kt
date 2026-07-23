@@ -10,6 +10,46 @@ import java.net.SocketTimeoutException
 
 class NetworkSocketFactoryTest {
     @Test
+    fun createRequiredBoundFactory_resolvesBoundFactoryForEverySocket() {
+        val first = Socket()
+        val second = Socket()
+        val sockets = ArrayDeque(listOf(first, second))
+        var resolutionCalls = 0
+
+        val factory = NetworkSocketFactory.createRequiredBoundFactory {
+            resolutionCalls += 1
+            sockets.removeFirstOrNull()?.let { socket -> { socket } }
+        }
+
+        assertSame(first, factory())
+        assertSame(second, factory())
+        assertEquals(2, resolutionCalls)
+    }
+
+    @Test
+    fun createRequiredBoundFactory_failsFastWhenNetworkIsUnavailable() {
+        val factory = NetworkSocketFactory.createRequiredBoundFactory { null }
+
+        val thrown = assertThrows(SocketException::class.java) { factory() }
+
+        assertEquals("Matched Wi-Fi network is unavailable", thrown.message)
+    }
+
+    @Test
+    fun createRequiredBoundFactory_doesNotFallbackWhenBindingIsDenied() {
+        val error = SocketException(
+            "Binding socket to network 226 failed: EPERM (Operation not permitted)"
+        )
+        val factory = NetworkSocketFactory.createRequiredBoundFactory {
+            { throw error }
+        }
+
+        val thrown = assertThrows(SocketException::class.java) { factory() }
+
+        assertSame(error, thrown)
+    }
+
+    @Test
     fun createWithFallback_returnsBoundSocketWithoutCreatingFallback() {
         val bound = Socket()
         var fallbackCalls = 0

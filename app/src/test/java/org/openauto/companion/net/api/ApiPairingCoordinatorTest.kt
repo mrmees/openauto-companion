@@ -13,6 +13,8 @@ import org.openauto.companion.data.Vehicle
 import prodigy.api.v1.Api
 import prodigy.api.v1.Common
 
+private const val VALID_PAIRING_CODE = "ABCDEFGHIJKLMNOPQRSTUVWX"
+
 class ApiPairingCoordinatorTest {
     @Test
     fun invalidInputAndDuplicateSsidFailBeforeNetworkOrTransportCreation() = runTest {
@@ -28,15 +30,15 @@ class ApiPairingCoordinatorTest {
 
         val blankSsid = harness.coordinator.pair(
             ApiPairingDraft(ssid = "  ", displayName = "Car", host = "10.0.0.1"),
-            pin = "123456"
+            pairingCode = VALID_PAIRING_CODE
         )
-        val invalidPin = harness.coordinator.pair(
+        val invalidCode = harness.coordinator.pair(
             ApiPairingDraft(ssid = "NewAP", displayName = "Car", host = "10.0.0.1"),
-            pin = "12345"
+            pairingCode = "ABCDEFGHIJKLMNOPQRSTUVW"
         )
         val duplicate = harness.coordinator.pair(
             ApiPairingDraft(ssid = "ExistingAP", displayName = "Car", host = "10.0.0.1"),
-            pin = "123456"
+            pairingCode = VALID_PAIRING_CODE
         )
         val invalidPort = harness.coordinator.pair(
             ApiPairingDraft(
@@ -45,11 +47,11 @@ class ApiPairingCoordinatorTest {
                 host = "10.0.0.1",
                 tcpPort = 0
             ),
-            pin = "123456"
+            pairingCode = VALID_PAIRING_CODE
         )
 
         assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, blankSsid)
-        assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, invalidPin)
+        assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, invalidCode)
         assertFailureKind(ApiPairingCoordinator.FailureKind.DUPLICATE_SSID, duplicate)
         assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_INPUT, invalidPort)
         assertEquals(0, harness.resolveCalls)
@@ -74,7 +76,7 @@ class ApiPairingCoordinatorTest {
                 host = "10.0.0.42",
                 tcpPort = 19810
             ),
-            pin = "123456"
+            pairingCode = VALID_PAIRING_CODE
         )
 
         assertTrue(result is ApiPairingCoordinator.Result.Success)
@@ -104,7 +106,7 @@ class ApiPairingCoordinatorTest {
 
         harness.coordinator.pair(
             ApiPairingDraft(ssid = "ProdigyAP", displayName = "Car", host = "  "),
-            pin = "123456"
+            pairingCode = VALID_PAIRING_CODE
         )
 
         assertEquals(ApiTcpTransport.DEFAULT_HOST, harness.transportHost)
@@ -123,7 +125,10 @@ class ApiPairingCoordinatorTest {
             val client = FakePairingClient(connectResult = ready)
             val harness = Harness(clientProvider = { client })
 
-            val result = harness.coordinator.pair(draft(), pin = "123456")
+            val result = harness.coordinator.pair(
+                draft(),
+                pairingCode = VALID_PAIRING_CODE
+            )
 
             assertFailureKind(ApiPairingCoordinator.FailureKind.INVALID_READY, result)
             assertNull(harness.savedVehicles)
@@ -135,7 +140,7 @@ class ApiPairingCoordinatorTest {
     fun rejectionEarlyCloseAndExceptionSaveNothingAndCloseClient() = runTest {
         val outcomes = listOf(
             FakePairingClient(
-                connectResult = ApiSessionClient.ConnectResult.Rejected("wrong PIN")
+                connectResult = ApiSessionClient.ConnectResult.Rejected("wrong pairing code")
             ) to ApiPairingCoordinator.FailureKind.REJECTED,
             FakePairingClient(
                 connectResult = ApiSessionClient.ConnectResult.Disconnected("early EOF")
@@ -147,7 +152,10 @@ class ApiPairingCoordinatorTest {
         outcomes.forEach { (client, expectedKind) ->
             val harness = Harness(clientProvider = { client })
 
-            val result = harness.coordinator.pair(draft(), pin = "123456")
+            val result = harness.coordinator.pair(
+                draft(),
+                pairingCode = VALID_PAIRING_CODE
+            )
 
             assertFailureKind(expectedKind, result)
             assertNull(harness.savedVehicles)
@@ -172,7 +180,10 @@ class ApiPairingCoordinatorTest {
                 clientProvider = { FakePairingClient(connectResult = rejected) }
             )
 
-            val result = harness.coordinator.pair(draft(), pin = "123456")
+            val result = harness.coordinator.pair(
+                draft(),
+                pairingCode = VALID_PAIRING_CODE
+            )
 
             assertFailureKind(ApiPairingCoordinator.FailureKind.PAIRING_WINDOW_CLOSED, result)
             assertEquals(
@@ -187,7 +198,7 @@ class ApiPairingCoordinatorTest {
     fun missingWifiFailsBeforeTransportCreation() = runTest {
         val harness = Harness(resolveSocketFactory = { _, _ -> null })
 
-        val result = harness.coordinator.pair(draft(), pin = "123456")
+        val result = harness.coordinator.pair(draft(), pairingCode = VALID_PAIRING_CODE)
 
         assertFailureKind(ApiPairingCoordinator.FailureKind.WIFI_NOT_FOUND, result)
         assertEquals(0, harness.transportCalls)
@@ -199,7 +210,7 @@ class ApiPairingCoordinatorTest {
         val client = FakePairingClient(connectError = CancellationException("cancelled"))
         val harness = Harness(clientProvider = { client })
 
-        val result = harness.coordinator.pair(draft(), pin = "123456")
+        val result = harness.coordinator.pair(draft(), pairingCode = VALID_PAIRING_CODE)
 
         assertEquals(ApiPairingCoordinator.Result.Cancelled, result)
         assertNull(harness.savedVehicles)
@@ -313,7 +324,9 @@ class ApiPairingCoordinatorTest {
                 .setServerName("Prodigy")
                 .setAppVersion("test")
                 .setSessionId("session")
-                .setCapabilities(Api.Capabilities.getDefaultInstance())
+                .setCapabilities(
+                    Api.Capabilities.newBuilder().setSecurePairingCode(true).build()
+                )
                 .apply { if (serverId != null) setServerId(serverId) }
                 .build()
     }

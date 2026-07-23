@@ -41,6 +41,49 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
 
 ---
 
+## 2026-07-22 20:44 (local)
+
+- What changed:
+  - Replaced six-digit pairing with the coordinated versioned 24-character
+    Base32 credential contract, including ASCII-only normalization, QR
+    `code=` parsing, challenge/capability negotiation, and shared crypto vectors.
+  - Added credential-generation persistence and storage version 2, which
+    retires legacy vehicles instead of attempting an insecure compatibility
+    path.
+  - Updated QR/manual pairing UI and retained the previously live-validated
+    per-attempt Wi-Fi network recovery change as an explicit branch commit.
+- Why:
+  - A captured six-digit pairing transcript was cheaply enumerable offline;
+    Prodigy and Companion needed one coordinated, fail-closed credential
+    generation upgrade.
+- Status: done
+- Dependency decision:
+  - Companion-only: No
+  - If No, reference `Blocked by Head Unit` entry: coordinated Prodigy secure
+    pairing fields, generation enforcement, and deployment in its API/core
+    asynchronous lifecycle wave.
+- Wishlist promotion:
+  - Source item: n/a
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Publish this branch as a separate draft PR to `main`.
+  - 2) Review and merge it together with the matching Prodigy draft PR.
+  - 3) Continue the existing Companion roadmap after the coordinated merge.
+- Verification:
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+  - Additional checks (if any):
+    - Prodigy and Companion API proto files -> byte-identical
+    - `git diff --check` -> PASS
+    - Repository review -> one confirmed normalization edge fixed; full rerun
+      LGTM
+    - Pixel upgrade -> PASS; legacy record retired and storage version 2 saved
+    - QR pairing and generation-2 persistence -> PASS
+    - Force-stop/relaunch saved-client reconnect -> PASS without manual entry
+    - Battery/GPS/connectivity reports and stable SOCKS route -> PASS
+  - AA stream continuity: preserved; Prodigy remained connected with H.265
+
+---
+
 ## 2026-07-08 11:22 (local)
 
 - What changed:
@@ -954,3 +997,53 @@ Non-behavior work (formatting, docs-only edits, no-op refactors) does not requir
   - API TCP peer after reconnect -> `[::ffff:10.0.0.21]:39004`; after forced
     portrait/landscape rotations and restoring auto-rotate -> unchanged source
     port `39004` throughout.
+
+## 2026-07-14 18:05 (local)
+
+- What changed:
+  - Changed foreground API runtime socket creation to re-resolve the matched
+    Wi-Fi `Network` from the saved vehicle SSID and host on every connection
+    attempt instead of retaining the startup handle across retries.
+  - Added a required-network socket path that fails fast when the matched
+    Wi-Fi is unavailable and never falls back to an unbound/default-network
+    socket. The existing EPERM fallback remains available to the separate
+    pairing flow.
+  - Added regressions proving per-socket re-resolution, fast failure without a
+    network, and no fallback after a bound-socket denial.
+- Why:
+  - After an airplane-mode cycle, the runtime repeatedly used the dead Android
+    `Network` handle from before the cycle. Its unbound fallback then routed
+    toward cellular and consumed about 35 seconds per failed attempt, so the
+    companion never reconnected even after the Prodigy Wi-Fi returned.
+- Status: done and live-validated on the Pixel/Prodigy bench.
+- Dependency decision:
+  - Companion-only: Yes
+- Wishlist promotion:
+  - Source item: n/a (live bench defect handoff)
+  - Promotion result: Not promoted
+- Next steps:
+  - 1) Review and commit the Companion fix on `dev`, then push when approved.
+  - 2) Record the successful self-heal rerun in Prodigy's bench handoff if that
+    repository's result ledger should be closed in the same release cycle.
+  - 3) Continue the existing deterministic Pi desktop/system routing priority.
+- Verification:
+  - Focused regression RED: test compilation failed because the new
+    required-network factory seam did not exist.
+  - `NetworkSocketFactoryTest` after implementation -> PASS.
+  - `git diff --check` -> PASS.
+  - `./gradlew :app:testDebugUnitTest :app:assembleDebug` -> PASS
+    (`BUILD SUCCESSFUL`; 166 unit tests, zero failures).
+  - Debug APK install on Pixel `39260DLJH000LX` -> PASS; initial API reports
+    and `socks5://::ffff:10.0.0.21:1080` route active.
+  - Airplane ON at 17:58:39 -> Prodigy expired the reporting session after
+    31,626 ms at 17:59:09, cleared owned companion state, and disabled the
+    proxy route.
+  - Airplane OFF at 17:59:30 -> Wi-Fi connected at 17:59:34 and Android Auto
+    connected at 17:59:36. Companion reporting, live GPS/battery, and the
+    SOCKS route recovered unattended at 18:00:08-09, within 35 seconds of
+    Wi-Fi rejoin and 39 seconds of airplane OFF.
+  - Companion PID remained `13160` across the complete cycle; no force-stop,
+    process restart, or Activity relaunch was used.
+  - AA stream continuity: the airplane cycle necessarily interrupted the
+    transport; AA reconnected automatically and the `:5277` session was
+    established after recovery.
